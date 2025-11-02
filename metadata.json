@@ -1,0 +1,5 @@
+{
+  "name": "Micro-Process Document Search",
+  "description": "A specialized search system that finds and validates documents, videos, news, and more from various sources. It features a non-editable viewer for secure content verification.",
+  "requestFramePermissions": []
+}
