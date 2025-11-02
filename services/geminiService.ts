@@ -5,7 +5,7 @@ import { LANGUAGE_OPTIONS } from '../constants';
 const schemas: Record<keyof SearchResult, any> = {
   documents: {
     type: Type.ARRAY,
-    description: "List of document search results. Generate a minimum of 10 items.",
+    description: "List of document search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -26,7 +26,7 @@ const schemas: Record<keyof SearchResult, any> = {
   },
   videos: {
     type: Type.ARRAY,
-    description: "List of video search results. Generate a minimum of 10 items.",
+    description: "List of video search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -43,7 +43,7 @@ const schemas: Record<keyof SearchResult, any> = {
   },
   news: {
     type: Type.ARRAY,
-    description: "List of news search results. Generate a minimum of 10 items.",
+    description: "List of news search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -61,7 +61,7 @@ const schemas: Record<keyof SearchResult, any> = {
   },
   forums: {
     type: Type.ARRAY,
-    description: "List of forum search results. Generate a minimum of 10 items.",
+    description: "List of forum search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -79,7 +79,7 @@ const schemas: Record<keyof SearchResult, any> = {
   },
   events: {
     type: Type.ARRAY,
-    description: "List of event search results. Generate a minimum of 10 items.",
+    description: "List of event search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -97,7 +97,7 @@ const schemas: Record<keyof SearchResult, any> = {
   },
   magazines: {
     type: Type.ARRAY,
-    description: "List of magazine search results. Generate a minimum of 10 items.",
+    description: "List of magazine search results.",
     items: {
       type: Type.OBJECT,
       properties: {
@@ -148,13 +148,13 @@ const fetchCategoryResults = async (
     - For 'forums', use links to sites like Reddit, Stack Overflow, or other public forums.
     Do NOT use placeholder URLs like 'example.com', 'your-site.com', or generic non-existent links. The URLs should look real even if they are illustrative.
 
-    You MUST generate a minimum of 10 relevant results for the '${String(category)}' category. If it's impossible to find 10 results, generate as many as you can, but the goal is at least 10.
+    Generate a list of relevant and varied results for the '${String(category)}' category. Prioritize quality over quantity.
     Ensure the generated data is realistic and relevant to the query. 
     ${documentSpecificInstructions}
     The 'id' for each item should be a unique string, for example '${String(category).slice(0, 3)}-1', '${String(category).slice(0, 3)}-123', etc.
     The 'category' for each item must be exactly '${String(category)}'.
     Adhere strictly to the provided JSON schema for the response. Do not add any extra text or explanations outside of the JSON object.
-    If no results are found, return an empty array.
+    If no results are found, you MUST return an empty array, and nothing else.
   `;
 
   try {
@@ -247,5 +247,30 @@ export const translateDocumentContent = async (content: string, targetLanguage: 
     } catch (error) {
         console.error("Error during translation swarm:", error);
         throw new Error("Failed to translate document content.");
+    }
+};
+
+export const summarizeContent = async (content: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Provide a concise, clear, and easy-to-understand summary of the following document content.
+        Focus on the key points, main arguments, and important conclusions.
+        The summary should be written in a neutral and objective tone.
+        Return only the summary text, without any introductory phrases like "This document is about..." or "In summary...".
+
+        --- DOCUMENT CONTENT ---
+        ${content}
+        --- END OF CONTENT ---
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error summarizing content with Gemini API:", error);
+        throw new Error("Failed to summarize document content.");
     }
 };

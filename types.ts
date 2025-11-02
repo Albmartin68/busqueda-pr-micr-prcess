@@ -68,3 +68,10 @@ export interface FilterOptions {
     country: string;
     language: string;
 }
+
+export interface FlashcardItem {
+  id: string; // e.g. "match-0-2" for paragraph 0, match 2
+  snippet: string; // The text with the match highlighted for display in the flashcard.
+  context: string; // The full paragraph or surrounding sentences.
+  paragraphIndex: number;
+}

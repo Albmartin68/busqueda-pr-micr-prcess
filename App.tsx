@@ -12,6 +12,7 @@ import { SpinnerIcon } from './components/icons/SpinnerIcon';
 import SettingsModal from './components/SettingsModal';
 import { FilePlusIcon } from './components/icons/FilePlusIcon';
 import TemplateGeneratorModal from './components/TemplateGeneratorModal';
+import WorkbenchModal from './components/WorkbenchModal';
 
 export default function App(): React.ReactElement {
   const [query, setQuery] = useState<string>('');
@@ -23,6 +24,7 @@ export default function App(): React.ReactElement {
   const [selectedDocument, setSelectedDocument] = useState<DocumentResult | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
+  const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState<number>(0);
   const timerRef = useRef<number | null>(null);
 
@@ -89,7 +91,7 @@ export default function App(): React.ReactElement {
 
   return (
     <div className="min-h-screen bg-slate-900 text-gray-200 font-sans">
-      <Header onSettingsClick={() => setIsSettingsOpen(true)} />
+      <Header onSettingsClick={() => setIsSettingsOpen(true)} onWorkbenchClick={() => setIsWorkbenchOpen(true)} />
       <main className="container mx-auto p-4 md:p-6">
         <div className="bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 max-w-5xl mx-auto">
           <SearchBar query={query} setQuery={setQuery} onSearch={() => handleSearch(query)} isLoading={isLoading} />
@@ -160,6 +162,12 @@ export default function App(): React.ReactElement {
         <SettingsModal onClose={() => setIsSettingsOpen(false)}>
             <Filters filters={filters} setFilters={setFilters} />
         </SettingsModal>
+      )}
+
+      {isWorkbenchOpen && (
+        <WorkbenchModal 
+          onClose={() => setIsWorkbenchOpen(false)}
+        />
       )}
     </div>
   );

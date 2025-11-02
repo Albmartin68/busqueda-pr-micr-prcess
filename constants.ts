@@ -18,14 +18,17 @@ export const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'magazines', label: 'Revistas' },
 ];
 
-export const TRANSLATION_LANGUAGES: { value: string; label: string }[] = [
-    { value: 'English', label: 'Inglés' },
-    { value: 'Spanish', label: 'Español' },
-    { value: 'French', label: 'Francés' },
-    { value: 'German', label: 'Alemán' },
-    { value: 'Chinese', label: 'Chino' },
-    { value: 'Japanese', label: 'Japonés' },
-    { value: 'Russian', label: 'Ruso' },
+export const ARGOS_LANGUAGES: { value: string; label: string }[] = [
+    { value: 'es', label: 'Español' },
+    { value: 'en', label: 'English' },
+    { value: 'fr', label: 'Français' },
+    { value: 'pt', label: 'Português' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'it', label: 'Italiano' },
+    { value: 'ru', label: 'Русский' },
+    { value: 'zh', label: '中文' },
+    { value: 'ar', label: 'العربية' },
+    { value: 'ja', label: '日本語' },
 ];
 
 export const DATE_RANGE_OPTIONS: {value: DateRange, label: string}[] = [
