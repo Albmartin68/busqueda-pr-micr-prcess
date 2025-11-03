@@ -77,21 +77,20 @@ export interface FlashcardItem {
 }
 
 // Types specific to the Workbench to avoid conflicts and ensure clarity
+// The new simplified model for the frontend mock, based on the user's spec.
 export interface WorkbenchSourceDocument {
-  name: string;
-  content: string;
-  country: string;
-  articulo: string;
-  tema: string;
-  path?: string;
-  lang?: string;
+  id: string; // e.g., 'doc-1'
+  filename: string;
+  content: string; // The full (mocked) content of the document
+  language: string; // e.g., 'es'
+  country: string; // e.g., 'ESP'
 }
 
 export interface WorkbenchFlashcard {
-  id: string;
-  pais: string;
-  articulo: string;
-  tema: string;
-  coincidencia: string; // The highlighted snippet
+  id: string; // e.g., 'flashcard-1-result-1'
   sourceDocument: WorkbenchSourceDocument;
+  pageNumber: number;
+  citation: string; // The text snippet with the match
+  queryMatch: string; // The specific term that was matched
+  score: number; // A relevance score, e.g., 0.95
 }

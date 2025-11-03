@@ -170,7 +170,6 @@ export default function App(): React.ReactElement {
       {isWorkbenchOpen && (
         <WorkbenchModal 
           onClose={() => setIsWorkbenchOpen(false)}
-          onQueryIndexed={setLibraryQuery}
           onViewSourceDocument={handleViewDocument}
         />
       )}
