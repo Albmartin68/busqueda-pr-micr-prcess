@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { XIcon } from './icons/XIcon';
 import { WorkbenchIcon } from './icons/WorkbenchIcon';
@@ -13,6 +12,7 @@ import { ViewerPanel } from './workbench/ViewerPanel';
 import { NotebookPanel } from './workbench/NotebookPanel';
 import { WorkbenchService } from '../services/workbenchService';
 import { Column } from './workbench/Column';
+import AddToNotebookModal from './workbench/AddToNotebookModal';
 
 interface Props {
   onClose: () => void;
@@ -31,6 +31,7 @@ export default function WorkbenchModal({ onClose }: Props) {
   const [selectedDoc, setSelectedDoc] = useState<WorkbenchSourceDocument | null>(null);
   const [notebookContent, setNotebookContent] = useState('');
   const [highlightedParagraphId, setHighlightedParagraphId] = useState<string | null>(null);
+  const [cardForNotebook, setCardForNotebook] = useState<WorkbenchFlashcard | null>(null);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -97,9 +98,14 @@ export default function WorkbenchModal({ onClose }: Props) {
   }, []);
 
   const handleAddToNotebook = useCallback((card: WorkbenchFlashcard) => {
-    const citationText = `> ${card.originalText.replace(/\n/g, '\n> ')}\n>\n> **Fuente**: ${card.sourceDocument.filename} | **Página**: ${card.pageNumber} | **País**: ${card.sourceDocument.country}\n---\n\n`;
-    setNotebookContent(prev => prev + citationText);
+    setCardForNotebook(card);
   }, []);
+  
+  const handleConfirmAddToNotebook = useCallback((formattedText: string) => {
+    setNotebookContent(prev => prev + formattedText);
+    setCardForNotebook(null); // Close the modal
+  }, []);
+
 
   const renderContent = () => {
     switch (stage) {
@@ -174,6 +180,14 @@ export default function WorkbenchModal({ onClose }: Props) {
             )}
         </footer>
       </div>
+
+      {cardForNotebook && (
+        <AddToNotebookModal 
+          card={cardForNotebook}
+          onClose={() => setCardForNotebook(null)}
+          onConfirm={handleConfirmAddToNotebook}
+        />
+      )}
     </div>
   );
 }

@@ -87,9 +87,9 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ flashcards, onFlashc
                 )}
             </div>
             {totalPages > 1 && (
-                <footer className="p-2 border-t border-slate-700 flex justify-between items-center flex-shrink-0">
+                <footer className="p-2 border-t border-sky-800 bg-sky-900 flex justify-between items-center flex-shrink-0">
                     <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 text-sm rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50">Anterior</button>
-                    <span className="text-sm text-gray-400">Página {currentPage} de {totalPages}</span>
+                    <span className="text-sm text-sky-200">Página {currentPage} de {totalPages}</span>
                     <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 text-sm rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50">Siguiente</button>
                 </footer>
             )}

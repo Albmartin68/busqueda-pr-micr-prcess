@@ -20,12 +20,12 @@ const summarizeFinding = async (query: string, paragraph: string): Promise<strin
     if (!paragraph.trim()) return "";
     const ai = getAI();
     const prompt = `
-        User Query: "${query}"
-        Context Paragraph: "${paragraph}"
+        Consulta del Usuario: "${query}"
+        Párrafo de Contexto: "${paragraph}"
 
-        Based on the user's query, provide a concise one or two-sentence summary of the key information from the paragraph.
-        This summary will be used as a "flashcard" finding. Extract only the most essential fact or data point relevant to the query.
-        Respond with only the summary text, without any introductory phrases.
+        Basado en la consulta del usuario, proporciona un resumen conciso de una o dos frases con la información clave del párrafo.
+        Este resumen se utilizará como un hallazgo para una "flashcard". Extrae solo el dato o hecho más esencial que sea relevante para la consulta.
+        Responde únicamente con el texto del resumen, sin ninguna frase introductoria.
     `;
 
     try {

@@ -48,11 +48,7 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ document, searchQuery,
     return (
         <>
             <header className="p-3 border-b border-slate-700 flex-shrink-0">
-                {document ? (
-                    <h3 className="font-bold text-white truncate">{document.filename}</h3>
-                ) : (
-                    <h3 className="font-bold text-white">Visor de Documentos</h3>
-                )}
+                <h3 className="font-bold text-white">Visor de Documentos</h3>
             </header>
             <div className="flex-grow overflow-y-auto p-4 whitespace-pre-wrap font-serif text-gray-300 leading-relaxed document-viewer-content">
                 {document ? (
@@ -65,9 +61,14 @@ export const ViewerPanel: React.FC<ViewerPanelProps> = ({ document, searchQuery,
                 )}
             </div>
             {document && (
-                <footer className="p-2 border-t border-slate-700 flex justify-end gap-4 text-xs text-gray-400 flex-shrink-0">
-                    <span>País: {document.country}</span>
-                    <span>Idioma: {document.language.toUpperCase()}</span>
+                <footer className="p-2 border-t border-sky-800 bg-sky-900 flex justify-between items-center gap-4 text-xs text-sky-100 flex-shrink-0">
+                    <span className="font-semibold truncate" title={document.filename}>
+                        {document.filename}
+                    </span>
+                    <div className="flex gap-4">
+                        <span><span className="text-sky-300">País:</span> {document.country}</span>
+                        <span><span className="text-sky-300">Idioma:</span> {document.language.toUpperCase()}</span>
+                    </div>
                 </footer>
             )}
         </>
