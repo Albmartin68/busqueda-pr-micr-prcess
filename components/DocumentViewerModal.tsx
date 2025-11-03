@@ -17,9 +17,10 @@ import { ClipboardListIcon } from './icons/ClipboardListIcon';
 interface DocumentViewerModalProps {
   document: DocumentResult;
   onClose: () => void;
+  initialSearchQuery?: string;
 }
 
-const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onClose }) => {
+const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onClose, initialSearchQuery = '' }) => {
   // Main state
   const [isCopied, setIsCopied] = useState<boolean>(false);
   
@@ -35,9 +36,10 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   const [targetLanguage, setTargetLanguage] = useState<string>(ARGOS_LANGUAGES[0].value);
 
   // Internal search state
-  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState(initialSearchQuery);
   const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
   const [activeFlashcardId, setActiveFlashcardId] = useState<string | null>(null);
+  const initialSearchPerformed = useRef(false);
 
   // Panel visibility state
   const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
@@ -61,17 +63,56 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
+  const performSearch = useCallback((query: string) => {
+    if (!query.trim()) {
+      setFlashcards([]);
+      setIsSearchPanelOpen(false);
+      return;
+    }
+    const queryTrimmed = query.trim();
+    const regex = new RegExp(queryTrimmed.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+    const paragraphs = contentToDisplay.split('\n\n');
+    const results: FlashcardItem[] = [];
+
+    paragraphs.forEach((p, pIndex) => {
+      if (p.toLowerCase().includes(queryTrimmed.toLowerCase())) {
+        const snippet = p.replace(regex, (match) => `<mark class="bg-yellow-300 text-black px-1 rounded">${match}</mark>`);
+        results.push({
+          id: `match-${pIndex}`,
+          context: p,
+          snippet,
+          paragraphIndex: pIndex,
+        });
+      }
+    });
+
+    setFlashcards(results);
+    setIsSearchPanelOpen(true);
+    setActiveFlashcardId(results.length > 0 ? results[0].id : null);
+  }, [contentToDisplay]);
+
   // Reset states when document changes
   useEffect(() => {
     setViewMode('complete');
     setSummary(null);
     setTranslatedContent(null);
-    setInternalSearchQuery('');
+    setInternalSearchQuery(initialSearchQuery);
     setFlashcards([]);
     setSelectedFlashcards({});
     setIsSearchPanelOpen(false);
     setIsExportPanelOpen(false);
-  }, [document]);
+    initialSearchPerformed.current = false;
+  }, [document, initialSearchQuery]);
+
+  // Auto-perform search on load if initial query exists
+  useEffect(() => {
+    if (initialSearchQuery && !initialSearchPerformed.current && contentToDisplay) {
+      performSearch(initialSearchQuery);
+      initialSearchPerformed.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSearchQuery, contentToDisplay]);
+
 
   // Handlers
   const handleCopy = (text: string, setCopied: (isCopied: boolean) => void) => {
@@ -126,38 +167,10 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
     setTranslationError(null);
   };
   
-  const performSearch = () => {
-    if (!internalSearchQuery.trim()) {
-      setFlashcards([]);
-      setIsSearchPanelOpen(false);
-      return;
-    }
-    const query = internalSearchQuery.trim();
-    const regex = new RegExp(query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
-    const paragraphs = contentToDisplay.split('\n\n');
-    const results: FlashcardItem[] = [];
-
-    paragraphs.forEach((p, pIndex) => {
-      if (p.toLowerCase().includes(query.toLowerCase())) {
-        const snippet = p.replace(regex, (match) => `<mark class="bg-yellow-300 text-black px-1 rounded">${match}</mark>`);
-        results.push({
-          id: `match-${pIndex}`,
-          context: p,
-          snippet,
-          paragraphIndex: pIndex,
-        });
-      }
-    });
-
-    setFlashcards(results);
-    setIsSearchPanelOpen(true);
-    setActiveFlashcardId(results.length > 0 ? results[0].id : null);
-  };
-
   const handleInternalSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      performSearch();
+      performSearch(internalSearchQuery);
     }
   };
   

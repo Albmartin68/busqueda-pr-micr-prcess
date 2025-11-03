@@ -26,6 +26,7 @@ export default function App(): React.ReactElement {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState<number>(0);
+  const [libraryQuery, setLibraryQuery] = useState<string>('');
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -77,8 +78,9 @@ export default function App(): React.ReactElement {
     setIsTemplateModalOpen(false);
   };
 
-  const handleViewDocument = (doc: DocumentResult) => {
+  const handleViewDocument = (doc: DocumentResult, queryOverride?: string) => {
     setSelectedDocument(doc);
+    setLibraryQuery(queryOverride || ''); // Set the new query or clear the old one
   };
 
   const displayedResults = useMemo(() => {
@@ -148,6 +150,7 @@ export default function App(): React.ReactElement {
         <DocumentViewerModal
           document={selectedDocument}
           onClose={() => setSelectedDocument(null)}
+          initialSearchQuery={libraryQuery}
         />
       )}
       
@@ -167,6 +170,8 @@ export default function App(): React.ReactElement {
       {isWorkbenchOpen && (
         <WorkbenchModal 
           onClose={() => setIsWorkbenchOpen(false)}
+          onQueryIndexed={setLibraryQuery}
+          onViewSourceDocument={handleViewDocument}
         />
       )}
     </div>

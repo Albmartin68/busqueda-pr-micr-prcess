@@ -75,3 +75,23 @@ export interface FlashcardItem {
   context: string; // The full paragraph or surrounding sentences.
   paragraphIndex: number;
 }
+
+// Types specific to the Workbench to avoid conflicts and ensure clarity
+export interface WorkbenchSourceDocument {
+  name: string;
+  content: string;
+  country: string;
+  articulo: string;
+  tema: string;
+  path?: string;
+  lang?: string;
+}
+
+export interface WorkbenchFlashcard {
+  id: string;
+  pais: string;
+  articulo: string;
+  tema: string;
+  coincidencia: string; // The highlighted snippet
+  sourceDocument: WorkbenchSourceDocument;
+}
