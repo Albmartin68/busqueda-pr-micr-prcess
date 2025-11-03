@@ -6,9 +6,10 @@ interface DropScreenProps {
     setFiles: React.Dispatch<React.SetStateAction<File[]>>;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
+    onSearch: (query: string) => void;
 }
 
-export const DropScreen: React.FC<DropScreenProps> = ({ files, setFiles, searchQuery, setSearchQuery }) => {
+export const DropScreen: React.FC<DropScreenProps> = ({ files, setFiles, searchQuery, setSearchQuery, onSearch }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dropzoneRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -21,6 +22,13 @@ export const DropScreen: React.FC<DropScreenProps> = ({ files, setFiles, searchQ
             return [...prev, ...newFiles.filter(f => !existingNames.has(f.name))];
         });
     }, [setFiles]);
+    
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            onSearch(searchQuery);
+        }
+    };
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -76,6 +84,7 @@ export const DropScreen: React.FC<DropScreenProps> = ({ files, setFiles, searchQ
                     id="workbench-query"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     className="w-full flex-grow bg-slate-800 border border-slate-700 rounded-md p-3 text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-base leading-relaxed resize-none"
                     placeholder='Ej: "¿Qué sanciones hay por exceso de velocidad superior en 50 km/h en vías urbanas, especialmente en Latinoamérica?"'
                 />

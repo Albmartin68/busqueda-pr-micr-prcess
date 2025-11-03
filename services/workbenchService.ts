@@ -111,7 +111,7 @@ export const WorkbenchService = {
     }
     
     onProgress('Buscando coincidencias...');
-    const potentialFindings: Array<{ sourceDoc: WorkbenchSourceDocument, page: { pageNum: number, content: string }, paragraph: string, pIndex: number }> = [];
+    const potentialFindings: Array<{ sourceDoc: WorkbenchSourceDocument, page: { pageNum: number, content: string }, paragraph: string, paragraphId: string }> = [];
 
     successfulDocs.forEach((docData, docIndex) => {
         const fullContent = docData.pages.map(p => p.content).join('\n\n');
@@ -124,17 +124,19 @@ export const WorkbenchService = {
         };
         sourceDocs.push(sourceDoc);
 
+        let paragraphCounter = 0;
         docData.pages.forEach(page => {
             const paragraphs = page.content.split(/\n\s*\n/);
-            paragraphs.forEach((p, pIndex) => {
+            paragraphs.forEach((p) => {
                 if (p.trim() && p.toLowerCase().includes(lowerCaseQuery)) {
                     potentialFindings.push({
                         sourceDoc,
                         page,
                         paragraph: p.trim(),
-                        pIndex,
+                        paragraphId: `${sourceDoc.id}-p-${paragraphCounter}`,
                     });
                 }
+                paragraphCounter++;
             });
         });
     });
@@ -160,16 +162,73 @@ export const WorkbenchService = {
     await new Promise(resolve => setTimeout(resolve, 300)); // Simulate final step
 
     const flashcards: WorkbenchFlashcard[] = summarizedFindings.map((finding) => ({
-        id: `flash-${finding.sourceDoc.id}-p${finding.page.pageNum}-${finding.pIndex}`,
+        id: `flash-${finding.paragraphId}`,
         sourceDocument: finding.sourceDoc,
         pageNumber: finding.page.pageNum,
         citation: finding.summary,
         originalText: finding.paragraph,
         queryMatch: query,
         score: 0.9,
+        paragraphId: finding.paragraphId,
     }));
 
     return { sourceDocs, flashcards };
+  },
+
+  async refineSearch(
+    sourceDocs: WorkbenchSourceDocument[],
+    query: string,
+    onProgress: (message: string) => void
+  ): Promise<WorkbenchFlashcard[]> {
+    onProgress('Reconsiderando la pregunta...');
+    const lowerCaseQuery = query.toLowerCase();
+    const potentialFindings: Array<{ sourceDoc: WorkbenchSourceDocument, paragraph: string, paragraphId: string }> = [];
+
+    sourceDocs.forEach(sourceDoc => {
+      const paragraphs = sourceDoc.content.split(/\n\s*\n/);
+      paragraphs.forEach((p, pIndex) => {
+        if (p.trim() && p.toLowerCase().includes(lowerCaseQuery)) {
+          potentialFindings.push({
+            sourceDoc,
+            paragraph: p.trim(),
+            paragraphId: `${sourceDoc.id}-p-${pIndex}`,
+          });
+        }
+      });
+    });
+
+    if (potentialFindings.length === 0) {
+      onProgress('No se encontraron nuevas coincidencias.');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return [];
+    }
+
+    onProgress(`Encontré ${potentialFindings.length} nuevas coincidencias. Resumiendo...`);
+
+    const summarizationPromises = potentialFindings.map(finding =>
+      summarizeFinding(query, finding.paragraph).then(summary => ({
+        ...finding,
+        summary: summary || finding.paragraph,
+      }))
+    );
+
+    const summarizedFindings = await Promise.all(summarizationPromises);
+
+    onProgress('Compilando nuevos resultados...');
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const flashcards: WorkbenchFlashcard[] = summarizedFindings.map((finding) => ({
+      id: `flash-${finding.paragraphId}`,
+      sourceDocument: finding.sourceDoc,
+      pageNumber: 1, // La información de página se pierde en el contenido plano, se asume 1
+      citation: finding.summary,
+      originalText: finding.paragraph,
+      queryMatch: query,
+      score: 0.9,
+      paragraphId: finding.paragraphId,
+    }));
+
+    return flashcards;
   },
 
   exportNotebook(content: string, format: 'txt' | 'md' | 'docx' | 'pdf') {

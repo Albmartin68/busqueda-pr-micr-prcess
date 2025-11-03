@@ -30,6 +30,7 @@ export default function WorkbenchModal({ onClose }: Props) {
   const [flashcards, setFlashcards] = useState<WorkbenchFlashcard[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<WorkbenchSourceDocument | null>(null);
   const [notebookContent, setNotebookContent] = useState('');
+  const [highlightedParagraphId, setHighlightedParagraphId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -45,18 +46,18 @@ export default function WorkbenchModal({ onClose }: Props) {
     setNotebookContent('');
     setSelectedDoc(null);
     setSourceDocs([]);
+    setHighlightedParagraphId(null);
   }, []);
 
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim() || files.length === 0) return;
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query.trim() || files.length === 0) return;
 
+    setSearchQuery(query);
     setStage('searching');
     setLoadingMessage('Iniciando proceso...');
     
     try {
-      const results = await WorkbenchService.search(files, searchQuery, (message) => {
-          setLoadingMessage(message);
-      });
+      const results = await WorkbenchService.search(files, query, setLoadingMessage);
       
       setSourceDocs(results.sourceDocs);
       setFlashcards(results.flashcards);
@@ -68,7 +69,32 @@ export default function WorkbenchModal({ onClose }: Props) {
       alert(`Error en la Mesa de Trabajo: ${errorMessage}`);
       setStage('import'); // Go back to import screen on error
     }
-  }, [searchQuery, files]);
+  }, [files]);
+
+  const handleRefineSearch = useCallback(async (newQuery: string) => {
+    if (!newQuery.trim() || sourceDocs.length === 0) return;
+
+    setSearchQuery(newQuery);
+    setStage('searching');
+    setLoadingMessage('Refinando búsqueda...');
+    try {
+        const newFlashcards = await WorkbenchService.refineSearch(sourceDocs, newQuery, setLoadingMessage);
+        setFlashcards(newFlashcards);
+    } catch (e) {
+        console.error("Workbench refine search failed:", e);
+        const errorMessage = e instanceof Error ? e.message : 'Ocurrió un error desconocido.';
+        alert(`Error al refinar la búsqueda: ${errorMessage}`);
+    } finally {
+        setStage('results');
+    }
+  }, [sourceDocs]);
+
+  const handleFlashcardClick = useCallback((card: WorkbenchFlashcard) => {
+    setSelectedDoc(card.sourceDocument);
+    setHighlightedParagraphId(card.paragraphId);
+    // Remove highlight after a delay to allow re-triggering
+    setTimeout(() => setHighlightedParagraphId(null), 10);
+  }, []);
 
   const handleAddToNotebook = useCallback((card: WorkbenchFlashcard) => {
     const citationText = `> ${card.originalText.replace(/\n/g, '\n> ')}\n>\n> **Fuente**: ${card.sourceDocument.filename} | **Página**: ${card.pageNumber} | **País**: ${card.sourceDocument.country}\n---\n\n`;
@@ -91,12 +117,14 @@ export default function WorkbenchModal({ onClose }: Props) {
                 <Column width="35%">
                     <ResultsPanel
                         flashcards={flashcards}
-                        onSelectFlashcard={(card) => setSelectedDoc(card.sourceDocument)}
+                        onFlashcardClick={handleFlashcardClick}
                         onAddToNotebook={handleAddToNotebook}
+                        onRefineSearch={handleRefineSearch}
+                        initialQuery={searchQuery}
                     />
                 </Column>
                 <Column width="40%">
-                    <ViewerPanel document={selectedDoc} searchQuery={searchQuery} />
+                    <ViewerPanel document={selectedDoc} searchQuery={searchQuery} highlightedParagraphId={highlightedParagraphId} />
                 </Column>
                 <Column width="25%">
                     <NotebookPanel content={notebookContent} setContent={setNotebookContent} />
@@ -111,6 +139,7 @@ export default function WorkbenchModal({ onClose }: Props) {
                 setFiles={setFiles} 
                 searchQuery={searchQuery} 
                 setSearchQuery={setSearchQuery}
+                onSearch={handleSearch}
             />
         );
     }
@@ -138,7 +167,7 @@ export default function WorkbenchModal({ onClose }: Props) {
                 </button>
             </div>
             {stage === 'import' && (
-                <button onClick={handleSearch} disabled={files.length === 0 || !searchQuery.trim()} className="flex items-center gap-2 px-8 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white disabled:bg-slate-500 disabled:cursor-not-allowed">
+                <button onClick={() => handleSearch(searchQuery)} disabled={files.length === 0 || !searchQuery.trim()} className="flex items-center gap-2 px-8 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white disabled:bg-slate-500 disabled:cursor-not-allowed">
                     <SearchIcon className="w-5 h-5"/>
                     Buscar en Carpeta Segura
                 </button>

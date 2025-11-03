@@ -94,4 +94,5 @@ export interface WorkbenchFlashcard {
   originalText: string; // The full original text of the finding
   queryMatch: string; // The specific term that was matched
   score: number; // A relevance score, e.g., 0.95
+  paragraphId: string; // e.g., 'doc-1-p-42'
 }
