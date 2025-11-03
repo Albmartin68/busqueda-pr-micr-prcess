@@ -1,8 +1,7 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { XIcon } from './icons/XIcon';
 import { WorkbenchIcon } from './icons/WorkbenchIcon';
+import { ImportIcon } from './icons/ImportIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { SpinnerIcon } from './icons/SpinnerIcon';
@@ -53,25 +52,18 @@ export default function WorkbenchModal({ onClose }: Props) {
     setStage('searching');
     setLoadingMessage('Iniciando proceso...');
     
-    try {
-      const results = await WorkbenchService.search(files, searchQuery, (message) => {
-          setLoadingMessage(message);
-      });
-      
-      setSourceDocs(results.sourceDocs);
-      setFlashcards(results.flashcards);
-      setSelectedDoc(results.sourceDocs[0] || null);
-      setStage('results');
-    } catch (e) {
-      console.error("Workbench search failed:", e);
-      const errorMessage = e instanceof Error ? e.message : 'Ocurrió un error desconocido.';
-      alert(`Error en la Mesa de Trabajo: ${errorMessage}`);
-      setStage('import'); // Go back to import screen on error
-    }
+    const results = await WorkbenchService.search(files, searchQuery, (message) => {
+        setLoadingMessage(message);
+    });
+    
+    setSourceDocs(results.sourceDocs);
+    setFlashcards(results.flashcards);
+    setSelectedDoc(results.sourceDocs[0] || null);
+    setStage('results');
   }, [searchQuery, files]);
 
   const handleAddToNotebook = useCallback((card: WorkbenchFlashcard) => {
-    const citationText = `> ${card.originalText.replace(/\n/g, '\n> ')}\n>\n> **Fuente**: ${card.sourceDocument.filename} | **Página**: ${card.pageNumber} | **País**: ${card.sourceDocument.country}\n---\n\n`;
+    const citationText = `> ${card.citation.replace(/\n/g, '\n> ')}\n>\n> **Fuente**: ${card.sourceDocument.filename} | **Página**: ${card.pageNumber} | **País**: ${card.sourceDocument.country}\n---\n\n`;
     setNotebookContent(prev => prev + citationText);
   }, []);
 

@@ -90,7 +90,8 @@ export interface WorkbenchFlashcard {
   id: string; // e.g., 'flashcard-1-result-1'
   sourceDocument: WorkbenchSourceDocument;
   pageNumber: number;
-  citation: string; // The text snippet with the match
+  citation: string; // The AI-generated summary of the finding
+  originalText: string; // The full original text of the finding
   queryMatch: string; // The specific term that was matched
   score: number; // A relevance score, e.g., 0.95
 }

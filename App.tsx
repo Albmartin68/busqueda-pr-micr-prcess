@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { SearchResult, DocumentResult, FilterOptions, ActiveTab } from './types';
 import { fetchSearchResults } from './services/geminiService';
@@ -170,7 +171,6 @@ export default function App(): React.ReactElement {
       {isWorkbenchOpen && (
         <WorkbenchModal 
           onClose={() => setIsWorkbenchOpen(false)}
-          onViewSourceDocument={handleViewDocument}
         />
       )}
     </div>
