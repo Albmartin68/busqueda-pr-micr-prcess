@@ -166,6 +166,23 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
     setTranslatedContent(null);
     setTranslationError(null);
   };
+
+  const handleDownloadTranslation = () => {
+    if (!translatedContent) return;
+
+    // Simple filename sanitization
+    const safeFilename = document.title.replace(/[^a-z0-9_.-]/gi, '_').toLowerCase();
+    
+    const blob = new Blob([translatedContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `translated_${safeFilename || 'document'}.txt`);
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   
   const handleInternalSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -271,7 +288,13 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
               </select>
             </div>
             {translatedContent ? (
-              <button onClick={handleRestoreOriginal} className="text-sm px-3 py-1.5 bg-slate-600 hover:bg-slate-500 rounded-md">Restaurar Original</button>
+              <>
+                <button onClick={handleRestoreOriginal} className="text-sm px-3 py-1.5 bg-slate-600 hover:bg-slate-500 rounded-md">Restaurar Original</button>
+                <button onClick={handleDownloadTranslation} className="flex items-center gap-2 text-sm px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-md text-white">
+                  <DownloadIcon className="w-4 h-4"/>
+                  Descargar
+                </button>
+              </>
             ) : (
               <button onClick={() => handleTranslate(targetLanguage)} disabled={isTranslationLoading} className="flex items-center gap-2 text-sm px-3 py-1.5 bg-sky-600 hover:bg-sky-500 rounded-md disabled:bg-slate-500 w-32 justify-center">
                 {isTranslationLoading ? <SpinnerIcon className="w-4 h-4"/> : <TranslateIcon className="w-4 h-4"/>}
