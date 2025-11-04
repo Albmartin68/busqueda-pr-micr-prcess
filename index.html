@@ -43,6 +43,116 @@
         border-radius: 4px;
         transition: background-color 0.3s;
       }
+
+      /* Styles for the new Document Editor */
+      .document-editor-page {
+        background: white;
+        color: black;
+        padding: 2.5cm 2cm; /* A4-like margins */
+        width: 21cm; /* A4 width */
+        min-height: 29.7cm; /* A4 height */
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        margin: 2rem auto;
+        font-family: 'Times New Roman', Times, serif;
+        font-size: 12pt;
+        line-height: 1.5;
+        position: relative;
+      }
+      .document-editor-page:focus {
+        outline: none;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 0 2px #38bdf8; /* sky-400 */
+      }
+      .document-editor-page h1 { font-size: 24pt; font-weight: bold; margin-bottom: 1em; }
+      .document-editor-page h2 { font-size: 18pt; font-weight: bold; margin-bottom: 0.8em; }
+      .document-editor-page h3 { font-size: 14pt; font-weight: bold; margin-bottom: 0.6em; }
+      .document-editor-page p { margin-bottom: 1em; }
+      .document-editor-page ul { list-style: disc; margin-left: 1.5em; margin-bottom: 1em; }
+      .document-editor-page ol { list-style: decimal; margin-left: 1.5em; margin-bottom: 1em; }
+      .document-editor-page figure {
+        margin: 1.5em auto;
+        border: 1px solid #e2e8f0; /* slate-200 */
+        border-radius: 4px;
+        background: #f8fafc; /* slate-50 */
+        padding: 0.5rem;
+        max-width: 90%;
+        position: relative;
+      }
+      .document-editor-page figure:hover .image-options {
+        opacity: 1;
+      }
+      .document-editor-page figure img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+      .document-editor-page figure figcaption {
+        font-size: 10pt;
+        color: #64748b; /* slate-500 */
+        text-align: center;
+        margin-top: 0.5rem;
+        font-style: italic;
+      }
+      .document-editor-page .comment-highlight {
+        background-color: rgba(250, 204, 21, 0.4); /* amber-300 with opacity */
+        cursor: pointer;
+        border-radius: 2px;
+      }
+
+      /* Drag-over overlay for editor */
+      .drag-over-overlay {
+        position: absolute;
+        inset: 0;
+        background-color: rgba(56, 189, 248, 0.2); /* sky-400 with opacity */
+        border: 3px dashed #0284c7; /* sky-600 */
+        border-radius: 8px; /* Matching the modal's border radius */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #0c4a6e; /* sky-900 */
+        pointer-events: none; /* Let clicks pass through */
+        z-index: 10;
+      }
+      
+      .toast-notification {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #1e293b; /* slate-800 */
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 1px solid #334155; /* slate-700 */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      /* Image options menu */
+      .image-options {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background-color: rgba(30, 41, 59, 0.8); /* slate-800 with opacity */
+        backdrop-filter: blur(4px);
+        border-radius: 6px;
+        border: 1px solid #334155; /* slate-700 */
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+      }
+
+      /* User avatars for collaboration simulation */
+      .user-avatar-stack > * + * {
+        margin-left: -0.75rem; /* -ml-3 */
+      }
 </style>
 </head>
   <body class="bg-slate-900 text-white">
@@ -53,6 +163,8 @@
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
       }
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

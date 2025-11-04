@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { SearchResult, FilterOptions, DocumentResult, VideoResult, NewsResult, ForumResult, EventResult, MagazineResult } from './types';
+import { SearchResult, FilterOptions, DocumentResult, VideoResult, NewsResult, ForumResult, EventResult, MagazineResult } from '../types';
 import { LANGUAGE_OPTIONS } from '../constants';
 
 const schemas: Record<keyof SearchResult, any> = {
@@ -234,10 +234,13 @@ export const translateDocumentContent = async (content: string, targetLanguage: 
 
     if (chunks.length === 0) return [""];
 
+    const languageMap = new Map(LANGUAGE_OPTIONS.map(l => [l.value, l.label]));
+    const targetLanguageLabel = languageMap.get(targetLanguage) || targetLanguage;
+
     const translationPromises = chunks.map(chunk => {
         return ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Translate the following text to ${targetLanguage}. Do not add any extra explanations, just provide the raw translation:\n\n---\n\n${chunk}`,
+            contents: `Translate the following text to ${targetLanguageLabel}. Do not add any extra explanations, just provide the raw translation:\n\n---\n\n${chunk}`,
         }).then(response => response.text);
     });
 
@@ -272,5 +275,111 @@ export const summarizeContent = async (content: string): Promise<string> => {
     } catch (error) {
         console.error("Error summarizing content with Gemini API:", error);
         throw new Error("Failed to summarize document content.");
+    }
+};
+
+export const generateImageCaption = async (base64Image: string, mimeType: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = "Describe this image for a document caption. Be concise and descriptive.";
+    
+    const imagePart = {
+      inlineData: {
+        data: base64Image,
+        mimeType,
+      },
+    };
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [{ text: prompt }, imagePart] },
+      });
+      return response.text;
+    } catch (error) {
+      console.error("Error generating image caption:", error);
+      return "Image description not available.";
+    }
+};
+
+export const extractTextFromImage = async (base64Image: string, mimeType: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = "Extract all text from this image. If there is no text, respond with an empty string. Only return the extracted text, nothing else.";
+
+    const imagePart = {
+        inlineData: {
+            data: base64Image,
+            mimeType,
+        },
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [{ text: prompt }, imagePart] },
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error extracting text from image:", error);
+        return "Could not extract text from image.";
+    }
+};
+
+export const analyzeRepository = async (repoUrl: string, analysisTopic: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Analyze the public GitHub repository located at the following URL: ${repoUrl}
+
+        Your task is to generate a section for a professional technical document based on the following topic:
+        **Topic: ${analysisTopic}**
+
+        Provide your response in well-formatted Markdown.
+        Do not include any introductory phrases like "Here is the section..." or "Based on the repository...".
+        Directly generate the raw Markdown content for the requested section.
+        If the repository is inaccessible or you cannot perform the analysis, respond with a clear error message in Markdown.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro', // Using a more powerful model for complex analysis
+            contents: prompt,
+            config: {
+                systemInstruction: `You are a world-class senior software architect and technical writer. Your task is to analyze a given public GitHub repository and generate sections of a professional technical document. You must infer the project's architecture, purpose, and potential issues from the repository's structure and any available code snippets or documentation, as you do not have direct file access.`,
+            },
+        });
+        return response.text;
+    } catch (error) {
+        console.error(`Error analyzing repository for topic '${analysisTopic}':`, error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return `### Error Analyzing Repository\n\nCould not generate the section for "${analysisTopic}".\n\n**Reason:** ${errorMessage}`;
+    }
+};
+
+export const translateFullDocument = async (content: string, targetLanguage: string): Promise<string> => {
+    const ai = getAI();
+    const languageMap = new Map(LANGUAGE_OPTIONS.map(l => [l.value, l.label]));
+    const targetLanguageLabel = languageMap.get(targetLanguage) || targetLanguage;
+
+    const prompt = `
+      Translate the following Markdown document to ${targetLanguageLabel}.
+      
+      **CRITICAL INSTRUCTIONS:**
+      1.  Preserve ALL Markdown formatting perfectly. This includes headings (e.g., '#', '##'), lists ('-', '*'), code blocks ('\`\`\`'), bold ('**'), italics ('*'), links ('[]()'), etc.
+      2.  Do not add any extra text, explanations, or introductory phrases like "Here is the translation...".
+      3.  Return only the raw, translated Markdown content.
+
+      --- DOCUMENT CONTENT ---
+      ${content}
+      --- END OF CONTENT ---
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text;
+    } catch (error) {
+        console.error(`Error translating full document to ${targetLanguageLabel}:`, error);
+        throw new Error(`Failed to translate the document to ${targetLanguageLabel}.`);
     }
 };

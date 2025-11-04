@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { SearchResult, DocumentResult, FilterOptions, ActiveTab } from './types';
 import { fetchSearchResults } from './services/geminiService';
@@ -14,6 +13,8 @@ import SettingsModal from './components/SettingsModal';
 import { FilePlusIcon } from './components/icons/FilePlusIcon';
 import TemplateGeneratorModal from './components/TemplateGeneratorModal';
 import WorkbenchModal from './components/WorkbenchModal';
+import EditorPlusModal from './components/EditorPlusModal';
+import GearInstaDocModal from './components/GearInstaDocModal';
 
 export default function App(): React.ReactElement {
   const [query, setQuery] = useState<string>('');
@@ -26,6 +27,8 @@ export default function App(): React.ReactElement {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
+  const [isEditorPlusOpen, setIsEditorPlusOpen] = useState<boolean>(false);
+  const [isGearInstaDocOpen, setIsGearInstaDocOpen] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState<number>(0);
   const [libraryQuery, setLibraryQuery] = useState<string>('');
   const timerRef = useRef<number | null>(null);
@@ -94,7 +97,12 @@ export default function App(): React.ReactElement {
 
   return (
     <div className="min-h-screen bg-slate-900 text-gray-200 font-sans">
-      <Header onSettingsClick={() => setIsSettingsOpen(true)} onWorkbenchClick={() => setIsWorkbenchOpen(true)} />
+      <Header
+        onSettingsClick={() => setIsSettingsOpen(true)}
+        onWorkbenchClick={() => setIsWorkbenchOpen(true)}
+        onEditorPlusClick={() => setIsEditorPlusOpen(true)}
+        onGearInstaDocClick={() => setIsGearInstaDocOpen(true)}
+      />
       <main className="container mx-auto p-4 md:p-6">
         <div className="bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 max-w-5xl mx-auto">
           <SearchBar query={query} setQuery={setQuery} onSearch={() => handleSearch(query)} isLoading={isLoading} />
@@ -171,6 +179,18 @@ export default function App(): React.ReactElement {
       {isWorkbenchOpen && (
         <WorkbenchModal 
           onClose={() => setIsWorkbenchOpen(false)}
+        />
+      )}
+
+      {isEditorPlusOpen && (
+        <EditorPlusModal 
+          onClose={() => setIsEditorPlusOpen(false)}
+        />
+      )}
+
+      {isGearInstaDocOpen && (
+        <GearInstaDocModal
+          onClose={() => setIsGearInstaDocOpen(false)}
         />
       )}
     </div>
