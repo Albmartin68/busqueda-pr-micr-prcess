@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { GearIcon } from './icons/GearIcon';
 import { SpinnerIcon } from './icons/SpinnerIcon';
@@ -12,7 +11,8 @@ import {
     generateRelatedWork,
     generateGlossary,
     generateAuditChecklist,
-    generateAnalyticalIndex
+    generateAnalyticalIndex,
+    translateFullDocument
 } from '../services/geminiService';
 import { DataFlowIcon } from './icons/DataFlowIcon';
 import { BugIcon } from './icons/BugIcon';
@@ -23,59 +23,139 @@ import { ThesisIcon } from './icons/ThesisIcon';
 import { IeeeIcon } from './icons/IeeeIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ApaIcon } from './icons/ApaIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
+import { TranslateIcon } from './icons/TranslateIcon';
+import { ARGOS_LANGUAGES } from '../constants';
+import { RefreshIcon } from './icons/RefreshIcon';
+import { XmlIcon } from './icons/XmlIcon';
 
 interface TechnicalDocGeneratorModalProps {
   onClose: () => void;
 }
 
-type SectionType = 'analysis' | 'format';
-type SectionId = 'architecture' | 'error_handling' | 'monitoring' | 'ci_cd' | 'security' | 'executive_summary' | 'related_work' | 'glossary' | 'audit_checklist' | 'analytical_index';
+type AnalysisSectionId = 'architecture' | 'error_handling' | 'monitoring' | 'ci_cd' | 'security';
+type DidacticSectionId = 'executive_summary' | 'related_work' | 'glossary' | 'audit_checklist' | 'analytical_index';
+type FormatId = 'M1' | 'M2' | 'M3' | 'M4' | 'M5';
 
-interface Section {
-    id: SectionId;
+interface AnalysisSection {
+    id: AnalysisSectionId;
     label: string;
     icon: React.ReactElement;
-    type: SectionType;
 }
 
-const ALL_SECTIONS: Section[] = [
-    { id: 'architecture', label: 'Arquitectura General', icon: <DataFlowIcon className="w-5 h-5" />, type: 'analysis' },
-    { id: 'error_handling', label: 'Manejo de Errores', icon: <BugIcon className="w-5 h-5" />, type: 'analysis' },
-    { id: 'monitoring', label: 'Métricas y Monitoreo', icon: <ChartBarIcon className="w-5 h-5" />, type: 'analysis' },
-    { id: 'ci_cd', label: 'CI/CD y Despliegue', icon: <BuildIcon className="w-5 h-5" />, type: 'analysis' },
-    { id: 'security', label: 'Seguridad', icon: <IsoIcon className="w-5 h-5" />, type: 'analysis' },
-    { id: 'executive_summary', label: 'Resumen Ejecutivo', icon: <ThesisIcon className="w-5 h-5"/>, type: 'format' },
-    { id: 'related_work', label: 'Trabajo Relacionado', icon: <IeeeIcon className="w-5 h-5"/>, type: 'format' },
-    { id: 'glossary', label: 'Glosario de Términos', icon: <BookOpenIcon className="w-5 h-5"/>, type: 'format' },
-    { id: 'audit_checklist', label: 'Check-list de Auditoría', icon: <IsoIcon className="w-5 h-5"/>, type: 'format' },
-    { id: 'analytical_index', label: 'Índice Analítico', icon: <ApaIcon className="w-5 h-5"/>, type: 'format' },
+interface EducationalFormat {
+    id: FormatId;
+    label: string;
+    icon: React.ReactElement;
+    requiredDidacticSections: DidacticSectionId[];
+}
+
+const ANALYSIS_SECTIONS: AnalysisSection[] = [
+    { id: 'architecture', label: 'Arquitectura General', icon: <DataFlowIcon className="w-5 h-5" /> },
+    { id: 'error_handling', label: 'Manejo de Errores', icon: <BugIcon className="w-5 h-5" /> },
+    { id: 'monitoring', label: 'Métricas y Monitoreo', icon: <ChartBarIcon className="w-5 h-5" /> },
+    { id: 'ci_cd', label: 'CI/CD y Despliegue', icon: <BuildIcon className="w-5 h-5" /> },
+    { id: 'security', label: 'Seguridad', icon: <IsoIcon className="w-5 h-5" /> },
 ];
 
-const DEFAULT_SELECTIONS: Record<SectionId, boolean> = {
-    architecture: true, error_handling: true, monitoring: true, ci_cd: false, security: false,
-    executive_summary: false, related_work: false, glossary: false, audit_checklist: false, analytical_index: false,
-};
+const EDUCATIONAL_FORMATS: EducationalFormat[] = [
+    { id: 'M1', label: 'Tesis Universidad de Chile', icon: <ThesisIcon className="w-5 h-5"/>, requiredDidacticSections: ['executive_summary', 'glossary', 'analytical_index'] },
+    { id: 'M2', label: 'Memoria Técnica ISO 9001', icon: <IsoIcon className="w-5 h-5"/>, requiredDidacticSections: ['audit_checklist'] },
+    { id: 'M3', label: 'Artículo IEEE Access', icon: <IeeeIcon className="w-5 h-5"/>, requiredDidacticSections: ['executive_summary', 'related_work'] },
+    { id: 'M4', label: 'Documento JATS 1.3 XML', icon: <XmlIcon className="w-5 h-5"/>, requiredDidacticSections: [] },
+    { id: 'M5', label: 'Ensayo APA 7ª Edición', icon: <ApaIcon className="w-5 h-5"/>, requiredDidacticSections: ['executive_summary', 'glossary'] },
+];
 
+const DEFAULT_ANALYSIS_SELECTIONS: Record<AnalysisSectionId, boolean> = {
+    architecture: true, error_handling: true, monitoring: true, ci_cd: false, security: false,
+};
 
 const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({ onClose }) => {
     const [repoUrl, setRepoUrl] = useState('');
-    const [selectedSections, setSelectedSections] = useState<Record<SectionId, boolean>>(DEFAULT_SELECTIONS);
+    const [selectedAnalysisSections, setSelectedAnalysisSections] = useState<Record<AnalysisSectionId, boolean>>(DEFAULT_ANALYSIS_SELECTIONS);
+    const [selectedFormat, setSelectedFormat] = useState<FormatId>(EDUCATIONAL_FORMATS[0].id);
+    const [isConfigSelectorOpen, setIsConfigSelectorOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [progressMessage, setProgressMessage] = useState('');
+    const [baseAnalysisContent, setBaseAnalysisContent] = useState<string | null>(null);
     const [generatedContent, setGeneratedContent] = useState('');
     const [isCopied, setIsCopied] = useState(false);
+    const [isTranslating, setIsTranslating] = useState(false);
+    const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+    const [targetLanguage, setTargetLanguage] = useState<string>(ARGOS_LANGUAGES[0].value);
+
+    const configSelectorRef = useRef<HTMLDivElement>(null);
+
+    const contentToDisplay = translatedContent ?? generatedContent;
 
     useEffect(() => {
         const handleEsc = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onClose();
         };
+        const handleClickOutside = (event: MouseEvent) => {
+            if (configSelectorRef.current && !configSelectorRef.current.contains(event.target as Node)) {
+                setIsConfigSelectorOpen(false);
+            }
+        };
         window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            window.removeEventListener('keydown', handleEsc);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, [onClose]);
 
-    const handleSectionToggle = (id: SectionId) => {
-        setSelectedSections(prev => ({ ...prev, [id]: !prev[id] }));
+    const handleSectionToggle = (id: AnalysisSectionId) => {
+        setSelectedAnalysisSections(prev => ({ ...prev, [id]: !prev[id] }));
     };
+
+    const applyFormatToContent = useCallback(async (baseContent: string, formatId: FormatId) => {
+        const format = EDUCATIONAL_FORMATS.find(f => f.id === formatId);
+        if (!format) {
+            console.error(`Formato con ID "${formatId}" no encontrado.`);
+            return baseContent;
+        }
+
+        setProgressMessage(`Aplicando formato: ${format.label}...`);
+        let finalContent = baseContent;
+
+        const didacticFunctions: Record<DidacticSectionId, () => Promise<string>> = {
+            executive_summary: () => generateExecutiveSummary(baseContent),
+            related_work: () => generateRelatedWork(repoUrl, baseContent),
+            glossary: () => generateGlossary(baseContent),
+            audit_checklist: () => generateAuditChecklist(repoUrl, baseContent),
+            analytical_index: () => generateAnalyticalIndex(baseContent),
+        };
+        
+        const didacticHeaders: Record<DidacticSectionId, string> = {
+            executive_summary: "Resumen Ejecutivo",
+            related_work: "Trabajo Relacionado",
+            glossary: "Glosario de Términos",
+            audit_checklist: "Check-list de Auditoría",
+            analytical_index: "Índice Analítico",
+        };
+
+        const sectionsToGenerate = [...format.requiredDidacticSections];
+        // Ensure summary is always first if present
+        if (sectionsToGenerate.includes('executive_summary')) {
+            sectionsToGenerate.splice(sectionsToGenerate.indexOf('executive_summary'), 1);
+            sectionsToGenerate.unshift('executive_summary');
+        }
+
+        for (const sectionId of sectionsToGenerate) {
+            setProgressMessage(`Generando: ${didacticHeaders[sectionId]}...`);
+            const sectionContent = await didacticFunctions[sectionId]();
+            if (sectionId === 'executive_summary') {
+                finalContent = `## ${didacticHeaders[sectionId]}\n\n${sectionContent}\n\n---\n\n` + finalContent;
+            } else {
+                finalContent += `\n\n---\n\n## ${didacticHeaders[sectionId]}\n\n${sectionContent}`;
+            }
+            setGeneratedContent(finalContent); // Update UI progressively
+        }
+
+        return finalContent;
+
+    }, [repoUrl]);
     
     const handleGenerate = useCallback(async () => {
         if (!repoUrl.trim() || !repoUrl.includes('github.com')) {
@@ -84,24 +164,24 @@ const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({
         }
         setIsLoading(true);
         setGeneratedContent('');
+        setBaseAnalysisContent(null);
+        setTranslatedContent(null);
         setProgressMessage('Iniciando análisis del repositorio...');
 
         try {
-            const analysisSectionIds = ALL_SECTIONS.filter(s => s.type === 'analysis' && selectedSections[s.id]).map(s => s.id);
-            const formatSectionIds = ALL_SECTIONS.filter(s => s.type === 'format' && selectedSections[s.id]).map(s => s.id);
+            const analysisSectionIds = ANALYSIS_SECTIONS.filter(s => selectedAnalysisSections[s.id]).map(s => s.id);
 
-            let baseContent = '# Documentación Técnica Autogenerada\n\n';
+            let baseContent = `# Documentación Técnica Autogenerada\n\n**Repositorio Analizado:** ${repoUrl}\n\n`;
+            
             if (analysisSectionIds.length > 0) {
                 const analysisPromises = analysisSectionIds.map(id => {
-                    const section = ALL_SECTIONS.find(s => s.id === id)!;
+                    const section = ANALYSIS_SECTIONS.find(s => s.id === id)!;
                     setProgressMessage(`Analizando: ${section.label}...`);
-                    return analyzeRepository(repoUrl, section.label)
-                        .then(result => ({ id, result }));
+                    return analyzeRepository(repoUrl, section.label).then(result => ({ id, result }));
                 });
-
                 const analysisResults = await Promise.all(analysisPromises);
                 const analysisContent = analysisResults.map(({id, result}) => {
-                    const section = ALL_SECTIONS.find(s => s.id === id)!;
+                    const section = ANALYSIS_SECTIONS.find(s => s.id === id)!;
                     return `## ${section.label}\n\n${result}`;
                 }).join('\n\n---\n\n');
                 baseContent += analysisContent;
@@ -109,41 +189,11 @@ const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({
                 baseContent += "No se seleccionaron secciones de análisis para el contenido base.";
             }
             
-            setGeneratedContent(baseContent);
+            setBaseAnalysisContent(baseContent); // Save the raw analysis result
 
-            let finalContent = baseContent;
-
-            const orderedFormatIds = formatSectionIds.sort((a, b) => a === 'executive_summary' ? -1 : (b === 'executive_summary' ? 1 : 0));
-
-            for (const id of orderedFormatIds) {
-                const section = ALL_SECTIONS.find(s => s.id === id)!;
-                setProgressMessage(`Generando: ${section.label}...`);
-                let newSectionContent = '';
-
-                switch (id) {
-                    case 'executive_summary':
-                        newSectionContent = await generateExecutiveSummary(baseContent);
-                        finalContent = `## Resumen Ejecutivo\n\n${newSectionContent}\n\n---\n\n` + finalContent;
-                        break;
-                    case 'related_work':
-                        newSectionContent = await generateRelatedWork(repoUrl, baseContent);
-                        finalContent += `\n\n---\n\n## Trabajo Relacionado\n\n${newSectionContent}`;
-                        break;
-                    case 'glossary':
-                        newSectionContent = await generateGlossary(baseContent);
-                        finalContent += `\n\n---\n\n## Glosario de Términos\n\n${newSectionContent}`;
-                        break;
-                    case 'audit_checklist':
-                        newSectionContent = await generateAuditChecklist(repoUrl, baseContent);
-                        finalContent += `\n\n---\n\n## Check-list de Auditoría\n\n${newSectionContent}`;
-                        break;
-                    case 'analytical_index':
-                        newSectionContent = await generateAnalyticalIndex(baseContent);
-                        finalContent += `\n\n---\n\n## Índice Analítico\n\n${newSectionContent}`;
-                        break;
-                }
-                setGeneratedContent(finalContent);
-            }
+            const finalFormattedContent = await applyFormatToContent(baseContent, selectedFormat);
+            setGeneratedContent(finalFormattedContent);
+            
         } catch (error) {
             console.error("Error generating document:", error);
             const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido.";
@@ -152,47 +202,62 @@ const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({
             setIsLoading(false);
             setProgressMessage('');
         }
-    }, [repoUrl, selectedSections]);
+    }, [repoUrl, selectedAnalysisSections, selectedFormat, applyFormatToContent]);
+
+    const handleUpdateFormat = useCallback(async () => {
+        if (!baseAnalysisContent) {
+            alert("Primero debe generar el documento base.");
+            return;
+        }
+        setIsLoading(true);
+        setTranslatedContent(null);
+        try {
+            const updatedContent = await applyFormatToContent(baseAnalysisContent, selectedFormat);
+            setGeneratedContent(updatedContent);
+        } catch (error) {
+            console.error("Error updating format:", error);
+            alert("Ocurrió un error al actualizar el formato.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [baseAnalysisContent, selectedFormat, applyFormatToContent]);
     
     const handleCopy = () => {
-        if (!generatedContent) return;
-        navigator.clipboard.writeText(generatedContent).then(() => {
+        if (!contentToDisplay) return;
+        navigator.clipboard.writeText(contentToDisplay).then(() => {
           setIsCopied(true);
           setTimeout(() => setIsCopied(false), 2000);
         });
     };
 
     const handleDownload = () => {
-        if (!generatedContent) return;
-        const blob = new Blob([generatedContent], { type: 'text/markdown;charset=utf-8' });
+        if (!contentToDisplay) return;
+        const blob = new Blob([contentToDisplay], { type: 'text/markdown;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         const repoName = repoUrl.split('/').pop() || 'document';
-        link.download = `doc_${repoName}.md`;
+        const langSuffix = translatedContent ? `_${targetLanguage}` : '';
+        link.download = `doc_${repoName}${langSuffix}.md`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     };
 
-    const renderSectionList = (type: SectionType) => (
-        <div className="space-y-2">
-            {ALL_SECTIONS.filter(s => s.type === type).map(section => (
-                <label key={section.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-700/50 cursor-pointer transition-colors">
-                    <input
-                        type="checkbox"
-                        checked={selectedSections[section.id]}
-                        onChange={() => handleSectionToggle(section.id)}
-                        className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-sky-500 focus:ring-sky-500 accent-sky-500"
-                    />
-                    {React.cloneElement(section.icon, { className: 'w-5 h-5 text-slate-400' })}
-                    <span className="text-sm text-gray-300">{section.label}</span>
-                </label>
-            ))}
-        </div>
-    );
-    
+    const handleTranslate = async () => {
+        if (!generatedContent) return;
+        setIsTranslating(true);
+        try {
+            const translation = await translateFullDocument(generatedContent, targetLanguage);
+            setTranslatedContent(translation);
+        } catch (error) {
+            console.error("Translation failed:", error);
+            alert("Ocurrió un error al traducir el documento.");
+        } finally {
+            setIsTranslating(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -214,17 +279,68 @@ const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({
                                 className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             />
                         </div>
-                        <div>
-                            <h3 className="text-md font-semibold text-gray-300 mb-2 border-b border-slate-700 pb-2">Secciones de Análisis</h3>
-                            {renderSectionList('analysis')}
-                        </div>
-                        <div>
-                            <h3 className="text-md font-semibold text-gray-300 mb-2 border-b border-slate-700 pb-2">Formatos Profesionales</h3>
-                            {renderSectionList('format')}
+
+                        <div className="relative" ref={configSelectorRef}>
+                            <button 
+                                onClick={() => setIsConfigSelectorOpen(prev => !prev)}
+                                className="w-full flex justify-between items-center px-4 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-sm font-semibold text-sky-300 hover:text-sky-200 transition-colors duration-200"
+                            >
+                                <span>Configurar Secciones de Análisis</span>
+                                <ChevronDownIcon className={`w-5 h-5 transition-transform ${isConfigSelectorOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isConfigSelectorOpen && (
+                                <div className="absolute top-full left-0 mt-2 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 p-4 max-h-96 overflow-y-auto">
+                                    <div className="space-y-2">
+                                        {ANALYSIS_SECTIONS.map(section => (
+                                            <label key={section.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-700/50 cursor-pointer transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedAnalysisSections[section.id]}
+                                                    onChange={() => handleSectionToggle(section.id)}
+                                                    className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-sky-500 focus:ring-sky-500 accent-sky-500"
+                                                />
+                                                {React.cloneElement(section.icon, { className: 'w-5 h-5 text-slate-400' })}
+                                                <span className="text-sm text-gray-300">{section.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </aside>
 
                     <div className="w-2/3 flex flex-col bg-slate-800/50">
+                        {generatedContent && !isLoading && (
+                            <div className="flex-shrink-0 p-2 border-b border-slate-700 flex items-center justify-between gap-2 flex-wrap bg-slate-900/50">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="format-select" className="text-xs font-semibold text-gray-400 whitespace-nowrap">Formato Educativo:</label>
+                                    <select 
+                                        id="format-select"
+                                        value={selectedFormat} 
+                                        onChange={(e) => setSelectedFormat(e.target.value as FormatId)} 
+                                        className="bg-slate-700 border border-slate-600 rounded-md py-1.5 pl-2 pr-8 text-xs focus:ring-sky-500 focus:border-sky-500 appearance-none">
+                                        {EDUCATIONAL_FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                                    </select>
+                                    <button onClick={handleUpdateFormat} className="flex items-center gap-2 text-xs px-3 py-1.5 bg-slate-600 hover:bg-slate-500 rounded-md">
+                                        <RefreshIcon className="w-4 h-4" />
+                                        <span>Actualizar</span>
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={isTranslating} className="bg-slate-700 border border-slate-600 rounded-md py-1.5 pl-2 pr-8 text-xs focus:ring-sky-500 focus:border-sky-500 appearance-none">
+                                        {ARGOS_LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                                    </select>
+                                    {translatedContent ? (
+                                        <button onClick={() => setTranslatedContent(null)} className="text-xs px-3 py-1.5 bg-slate-600 hover:bg-slate-500 rounded-md">Restaurar Original</button>
+                                    ) : (
+                                        <button onClick={handleTranslate} disabled={isTranslating} className="flex items-center gap-2 text-xs px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-md disabled:bg-slate-500 w-28 justify-center">
+                                            {isTranslating ? <SpinnerIcon className="w-4 h-4" /> : <TranslateIcon className="w-4 h-4" />}
+                                            <span>{isTranslating ? 'Traduciendo...' : 'Traducir'}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <div className="flex-grow p-6 overflow-y-auto whitespace-pre-wrap font-mono text-sm text-gray-300">
                             {isLoading && (
                                 <div className="flex flex-col items-center justify-center h-full text-center">
@@ -232,24 +348,24 @@ const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({
                                     <p className="text-lg text-gray-300">{progressMessage}</p>
                                 </div>
                             )}
-                            {generatedContent && !isLoading && (
-                                <pre className="whitespace-pre-wrap font-sans">{generatedContent}</pre>
+                            {contentToDisplay && !isLoading && (
+                                <div className="whitespace-pre-wrap font-sans" dangerouslySetInnerHTML={{ __html: contentToDisplay.replace(/---\n/g, '<hr class="border-slate-700 my-6">\n') }}></div>
                             )}
                             {!isLoading && !generatedContent && (
                                 <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
                                     <GearIcon className="w-16 h-16 mb-4" />
                                     <h3 className="text-xl font-semibold text-gray-400">Listo para generar</h3>
-                                    <p className="max-w-md mt-2">Introduce una URL de repositorio, selecciona las secciones deseadas y haz clic en "Generar Documento" para empezar.</p>
+                                    <p className="max-w-md mt-2">Introduce una URL de repositorio, selecciona las secciones y haz clic en "Generar Documento" para empezar.</p>
                                 </div>
                             )}
                         </div>
                         {(generatedContent && !isLoading) && (
-                            <div className="flex-shrink-0 p-2 border-t border-slate-700 flex items-center justify-end gap-2">
-                                <button onClick={handleCopy} disabled={isLoading || !generatedContent} className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${isCopied ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}>
+                             <div className="flex-shrink-0 p-2 border-t border-slate-700 flex items-center justify-end gap-2">
+                                <button onClick={handleCopy} className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${isCopied ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}>
                                     {isCopied ? <CheckIcon className="w-4 h-4" /> : <ClipboardIcon className="w-4 h-4" />}
                                     {isCopied ? 'Copiado' : 'Copiar'}
                                 </button>
-                                <button onClick={handleDownload} disabled={isLoading || !generatedContent} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-sky-700 hover:bg-sky-600 text-white">
+                                <button onClick={handleDownload} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-sky-700 hover:bg-sky-600 text-white">
                                     <DownloadIcon className="w-4 h-4" /> Descargar (.md)
                                 </button>
                             </div>
