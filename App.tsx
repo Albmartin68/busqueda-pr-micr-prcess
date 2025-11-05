@@ -14,7 +14,7 @@ import { FilePlusIcon } from './components/icons/FilePlusIcon';
 import TemplateGeneratorModal from './components/TemplateGeneratorModal';
 import WorkbenchModal from './components/WorkbenchModal';
 import EditorPlusModal from './components/EditorPlusModal';
-import TechnicalDocGeneratorModal from './components/GearInstaDocModal';
+import TechnicalDocGeneratorModal from './components/TechnicalDocGeneratorModal';
 
 export default function App(): React.ReactElement {
   const [query, setQuery] = useState<string>('');

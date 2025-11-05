@@ -383,3 +383,121 @@ export const translateFullDocument = async (content: string, targetLanguage: str
         throw new Error(`Failed to translate the document to ${targetLanguageLabel}.`);
     }
 };
+
+// --- DIDACTIC & PROFESSIONAL FORMAT FUNCTIONS ---
+
+export const generateExecutiveSummary = async (documentText: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Generate an executive summary for the following technical document.
+        The summary must be a single paragraph.
+        It must be no more than 150 words.
+        It must have a Flesch-Kincaid readability score of 12 or lower.
+        The summary must include the project's main objective and its key result or conclusion.
+        Return ONLY the summary text, without any headers or introductory phrases.
+
+        --- DOCUMENT TEXT ---
+        ${documentText}
+        --- END TEXT ---
+    `;
+    try {
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating executive summary:", error);
+        return "Error: Could not generate summary.";
+    }
+};
+
+export const generateRelatedWork = async (repoUrl: string, documentText: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Analyze the following technical document derived from the repository at ${repoUrl}.
+        Your task is to generate a "Related Work" section in Markdown.
+        1.  Extract the key technical concepts and keywords from the document.
+        2.  Simulate a search on academic databases (like arXiv, Crossref) for these concepts.
+        3.  Generate a comparative paragraph that discusses how this project relates to at least 3 other similar or foundational technologies/papers.
+        4.  The tone should be academic and professional.
+        Return ONLY the Markdown content for the "Related Work" section.
+
+        --- DOCUMENT TEXT ---
+        ${documentText}
+        --- END TEXT ---
+    `;
+    try {
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating related work:", error);
+        return "Error: Could not generate related work section.";
+    }
+};
+
+export const generateGlossary = async (documentText: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Read the following technical document and identify up to 30 technical terms, acronyms, or jargon that a non-expert might not understand.
+        For each term, provide a concise definition (under 120 characters).
+        Format the output as a Markdown list. Example:
+        *   **Term 1**: Brief definition.
+        *   **Term 2**: Brief definition.
+        Return ONLY the Markdown list for the "Glossary" section.
+
+        --- DOCUMENT TEXT ---
+        ${documentText}
+        --- END TEXT ---
+    `;
+    try {
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating glossary:", error);
+        return "Error: Could not generate glossary.";
+    }
+};
+
+export const generateAuditChecklist = async (repoUrl: string, documentText: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Act as an ISO 9001/27001 auditor. Analyze the technical document for the repository at ${repoUrl}.
+        Based on the content (ADRs, error logs, metrics), generate an audit checklist table in Markdown.
+        The table should have three columns: "Requisito ISO", "Evidencia Encontrada", and "Estado (✅/❌)".
+        Map the document's content to common ISO requirements like risk management, requirement traceability, and monitoring.
+        Infer the status based on whether evidence is present in the document.
+        Return ONLY the Markdown table for the "Check-list de Auditoría" section.
+
+        --- DOCUMENT TEXT ---
+        ${documentText}
+        --- END TEXT ---
+    `;
+    try {
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating audit checklist:", error);
+        return "Error: Could not generate audit checklist.";
+    }
+};
+
+export const generateAnalyticalIndex = async (documentText: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        Analyze the following document and act as a natural language processing (NLP) keyword extractor.
+        Identify at least 10 key technical terms or concepts.
+        For each term, simulate finding the page number where it first appears (assume a standard document format where every 300 words is a new page).
+        Format the output as a two-column Markdown table: "Término" and "Página".
+        The list of terms must be sorted alphabetically.
+        Return ONLY the Markdown table for the "Índice Analítico" section.
+
+        --- DOCUMENT TEXT ---
+        ${documentText}
+        --- END TEXT ---
+    `;
+    try {
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating analytical index:", error);
+        return "Error: Could not generate analytical index.";
+    }
+};
