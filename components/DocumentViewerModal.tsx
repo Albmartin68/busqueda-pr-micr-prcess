@@ -193,7 +193,6 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   
   const handleFlashcardClick = (card: FlashcardItem) => {
     setActiveFlashcardId(card.id);
-    // FIX: Use window.document to avoid conflict with the 'document' prop.
     const element = window.document.getElementById(`paragraph-${card.paragraphIndex}`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -212,18 +211,14 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   };
   
   const handleDownloadSelection = (format: 'txt' | 'md') => {
-    // FIX: Property 'context' does not exist on type 'unknown'. Explicitly type 'fc' as FlashcardItem.
     const content = Object.values(selectedFlashcards).map((fc: FlashcardItem) => fc.context).join('\n\n');
     const blob = new Blob([content], { type: format === 'md' ? 'text/markdown' : 'text/plain' });
     const url = URL.createObjectURL(blob);
-    // FIX: Use window.document to avoid conflict with the 'document' prop.
     const a = window.document.createElement('a');
     a.href = url;
     a.download = `selection.${format}`;
-    // FIX: Use window.document to avoid conflict with the 'document' prop.
     window.document.body.appendChild(a);
     a.click();
-    // FIX: Use window.document to avoid conflict with the 'document' prop.
     window.document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
@@ -311,56 +306,65 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
             <button onClick={() => setIsExportPanelOpen(!isExportPanelOpen)} className={`p-2 rounded-md transition-colors ${isExportPanelOpen ? 'bg-sky-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}><ClipboardListIcon className="w-4 h-4"/></button>
           </div>
         </div>
-        {isTranslationLoading && <div className="flex items-center justify-center p-2 bg-slate-800 text-sm text-sky-400"><SwarmIcon className="w-4 h-4 mr-2"/>El enjambre de micro-procesadores está traduciendo...</div>}
-        {translationError && <p className="p-2 text-center text-sm bg-red-900/50 text-red-400">{translationError}</p>}
+        {isTranslationLoading && <div className="flex items-center justify-center p-2 text-sm text-gray-400 bg-slate-800"><SpinnerIcon className="w-4 h-4 mr-2"/> Traducción en curso...</div>}
+        {translationError && <div className="flex items-center justify-center p-2 text-sm text-red-400 bg-red-900/20">{translationError}</div>}
 
-        {/* Main Content Area */}
         <div className="flex-grow flex overflow-hidden">
-          <div className="document-viewer-content p-6 md:p-8 flex-grow overflow-y-auto whitespace-pre-wrap text-gray-300 leading-relaxed font-serif text-[17px] transition-all duration-300">
-            {isSummaryLoading ? <div className="flex justify-center items-center h-full"><SpinnerIcon className="w-8 h-8"/></div> : renderContent}
-          </div>
-          
-          {/* Search "Flashcards" Panel */}
-          <aside className={`flex flex-col bg-slate-800/70 backdrop-blur-sm transition-all duration-300 ease-in-out flex-shrink-0 ${isSearchPanelOpen ? 'w-1/3 border-l' : 'w-0'} border-slate-700`}>
-            {isSearchPanelOpen && <>
-              <header className="p-3 border-b border-slate-700 flex-shrink-0"><h3 className="font-bold text-white">Resultados de Búsqueda ({flashcards.length})</h3></header>
-              <div className="overflow-y-auto p-2 space-y-2 flex-grow">
-                {flashcards.length > 0 ? flashcards.map(card => (
-                  <div key={card.id} onClick={() => handleFlashcardClick(card)} className={`p-3 rounded-md cursor-pointer border-2 transition-colors ${activeFlashcardId === card.id ? 'bg-sky-900/50 border-sky-600' : 'bg-slate-700/50 border-transparent hover:bg-slate-700'}`}>
-                    <div className="flex justify-between items-start">
-                      <p className="text-xs text-gray-400 mb-2" dangerouslySetInnerHTML={{ __html: card.snippet }}></p>
-                      <input type="checkbox" checked={!!selectedFlashcards[card.id]} onChange={() => handleToggleFlashcardSelection(card)} onClick={e => e.stopPropagation()} className="ml-2 mt-1 accent-sky-500 flex-shrink-0"/>
-                    </div>
-                  </div>
-                )) : <p className="p-4 text-center text-gray-400 text-sm">No se encontraron resultados para "{internalSearchQuery}".</p>}
-              </div>
-            </>}
-          </aside>
+            {/* Main Content Viewer */}
+            <div className="flex-grow overflow-y-auto">
+                <div className="p-6 md:p-8 whitespace-pre-wrap text-gray-300 leading-relaxed document-content">
+                    {isSummaryLoading ? (
+                        <div className="flex justify-center items-center h-full"><SpinnerIcon className="w-8 h-8"/></div>
+                    ) : (
+                        renderContent
+                    )}
+                </div>
+            </div>
 
-          {/* Export Panel */}
-          <aside className={`flex flex-col bg-slate-800/70 backdrop-blur-sm transition-all duration-300 ease-in-out flex-shrink-0 ${isExportPanelOpen ? 'w-1/3 border-l' : 'w-0'} border-slate-700`}>
-            {isExportPanelOpen && <>
-              <header className="p-3 border-b border-slate-700 flex-shrink-0"><h3 className="font-bold text-white">Selección para Exportar ({Object.keys(selectedFlashcards).length})</h3></header>
-              <textarea
-                readOnly
-                // FIX: Property 'context' does not exist on type 'unknown'. Explicitly type 'f' as FlashcardItem.
-                value={Object.values(selectedFlashcards).map((f: FlashcardItem) => f.context).join('\n\n')}
-                className="flex-grow bg-slate-900 p-3 text-sm font-mono focus:outline-none resize-none w-full"
-                placeholder="Seleccione fragmentos de los resultados de búsqueda para agregarlos aquí."
-              />
-              <footer className="p-2 border-t border-slate-700 flex justify-end gap-2 flex-shrink-0">
-                <button onClick={() => {
-                  // FIX: Property 'context' does not exist on type 'unknown'. Explicitly type 'f' as FlashcardItem.
-                  handleCopy(Object.values(selectedFlashcards).map((f: FlashcardItem) => f.context).join('\n\n'), setIsSelectionCopied)
-                }} className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${isSelectionCopied ? 'bg-green-600' : 'bg-slate-700 hover:bg-slate-600'}`}>
-                  {isSelectionCopied ? <CheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
-                  Copiar
-                </button>
-                <button onClick={() => handleDownloadSelection('txt')} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-sky-700 hover:bg-sky-600"><DownloadIcon className="w-4 h-4"/> .txt</button>
-                <button onClick={() => handleDownloadSelection('md')} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-sky-700 hover:bg-sky-600"><DownloadIcon className="w-4 h-4"/> .md</button>
-              </footer>
-            </>}
-          </aside>
+            {/* Right Side Panels */}
+            {(isSearchPanelOpen || isExportPanelOpen) && (
+                <aside className="flex-shrink-0 w-96 border-l border-slate-800 flex flex-col transition-all duration-300">
+                    {/* Search Panel */}
+                    {isSearchPanelOpen && (
+                        <div className={`flex flex-col ${isExportPanelOpen ? 'h-1/2' : 'h-full'}`}>
+                            <header className="p-3 border-b border-slate-700 flex-shrink-0">
+                                <h3 className="font-bold text-white">Resultados ({flashcards.length})</h3>
+                            </header>
+                            <div className="overflow-y-auto p-2 space-y-2 flex-grow">
+                                {flashcards.length > 0 ? flashcards.map(card => (
+                                    <div key={card.id} onClick={() => handleFlashcardClick(card)} className={`p-2 rounded-md cursor-pointer transition-colors flex items-start gap-2 ${activeFlashcardId === card.id ? 'bg-sky-800' : 'hover:bg-slate-700'}`}>
+                                        <input type="checkbox" checked={!!selectedFlashcards[card.id]} onChange={() => handleToggleFlashcardSelection(card)} onClick={e => e.stopPropagation()} className="mt-1 accent-sky-500" />
+                                        <span className="text-sm" dangerouslySetInnerHTML={{ __html: card.snippet }} />
+                                    </div>
+                                )) : (
+                                    <p className="text-sm text-gray-500 text-center p-4">No se encontraron resultados.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {/* Export Panel */}
+                    {isExportPanelOpen && (
+                        <div className={`flex flex-col ${isSearchPanelOpen ? 'h-1/2 border-t border-slate-800' : 'h-full'}`}>
+                             <header className="p-3 border-b border-slate-700 flex-shrink-0 flex justify-between items-center">
+                                <h3 className="font-bold text-white">Exportar Selección ({Object.keys(selectedFlashcards).length})</h3>
+                            </header>
+                            <div className="p-4 space-y-4">
+                                <button onClick={() => handleCopy(Object.values(selectedFlashcards).map(fc => fc.context).join('\n\n'), setIsSelectionCopied)}
+                                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${isSelectionCopied ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}>
+                                    {isSelectionCopied ? <CheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
+                                    {isSelectionCopied ? '¡Copiado!' : 'Copiar Selección'}
+                                </button>
+                                <button onClick={() => handleDownloadSelection('txt')} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md bg-slate-700 hover:bg-slate-600">
+                                   Descargar como .txt
+                                </button>
+                                 <button onClick={() => handleDownloadSelection('md')} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md bg-slate-700 hover:bg-slate-600">
+                                   Descargar como .md
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </aside>
+            )}
         </div>
       </div>
     </div>

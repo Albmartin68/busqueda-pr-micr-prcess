@@ -1,6 +1,4 @@
-
 import React from 'react';
-// FIX: Update type import to use the discriminated union for better type safety.
 import { SearchResultItem, DocumentResult } from '../types';
 import { DocIcon, DocxIcon, XlsxIcon, PptxIcon } from './icons/FileIcons';
 import { VideoIcon } from './icons/VideoIcon';

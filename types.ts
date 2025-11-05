@@ -1,4 +1,3 @@
-// FIX: Define types for the application.
 export type ActiveTab = 'all' | 'documents' | 'videos' | 'news' | 'forums' | 'events' | 'magazines';
 
 export interface SearchResultItemBase {

@@ -1,4 +1,3 @@
-// FIX: Create Filters component.
 import React from 'react';
 import { FilterOptions, DateRange, DocumentType } from '../types';
 import { DATE_RANGE_OPTIONS, DOCUMENT_TYPE_OPTIONS, COUNTRY_OPTIONS, LANGUAGE_OPTIONS } from '../constants';

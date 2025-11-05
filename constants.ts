@@ -1,4 +1,3 @@
-// FIX: Define constants for the application.
 import { FilterOptions, ActiveTab, DateRange, DocumentType } from './types';
 
 export const INITIAL_FILTERS: FilterOptions = {

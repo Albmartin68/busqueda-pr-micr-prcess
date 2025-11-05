@@ -172,7 +172,6 @@ const fetchCategoryResults = async (
     if (!jsonText) return [];
     return JSON.parse(jsonText);
   } catch (error) {
-    // FIX: Explicitly convert category to string to avoid runtime error.
     console.error(`Error fetching search results for category '${String(category)}' from Gemini API:`, error);
     return [];
   }
@@ -291,7 +290,7 @@ export const generateImageCaption = async (base64Image: string, mimeType: string
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: prompt }, imagePart] },
       });
       return response.text;
@@ -314,7 +313,7 @@ export const extractTextFromImage = async (base64Image: string, mimeType: string
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }, imagePart] },
         });
         return response.text;
