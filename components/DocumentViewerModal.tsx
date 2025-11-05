@@ -349,7 +349,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
                                 <h3 className="font-bold text-white">Exportar Selección ({Object.keys(selectedFlashcards).length})</h3>
                             </header>
                             <div className="p-4 space-y-4">
-                                <button onClick={() => handleCopy(Object.values(selectedFlashcards).map(fc => fc.context).join('\n\n'), setIsSelectionCopied)}
+                                <button onClick={() => handleCopy(Object.values(selectedFlashcards).map((fc: FlashcardItem) => fc.context).join('\n\n'), setIsSelectionCopied)}
                                     className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${isSelectionCopied ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}>
                                     {isSelectionCopied ? <CheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
                                     {isSelectionCopied ? '¡Copiado!' : 'Copiar Selección'}

@@ -5,12 +5,23 @@ import { SpinnerIcon } from './icons/SpinnerIcon';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { CheckIcon } from './icons/CheckIcon';
-import { analyzeRepository } from '../services/geminiService';
+import {
+  analyzeRepository,
+  translateFullDocument,
+  generateExecutiveSummary,
+  generateRelatedWork,
+  generateGlossary,
+  generateAuditChecklist,
+  generateAnalyticalIndex,
+} from '../services/geminiService';
 import { ThesisIcon } from './icons/ThesisIcon';
 import { CodeCommitIcon } from './icons/CodeCommitIcon';
 import { BugIcon } from './icons/BugIcon';
 import { BuildIcon } from './icons/BuildIcon';
 import { TerminalIcon } from './icons/TerminalIcon';
+import { ARGOS_LANGUAGES } from '../constants';
+import { TranslateIcon } from './icons/TranslateIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
 
 const SECTIONS = [
   { id: 'project-overview', label: 'Resumen Ejecutivo y Visión General', icon: <ThesisIcon className="w-5 h-5"/>, topic: "Project executive summary, goals, and target audience." },
@@ -20,6 +31,15 @@ const SECTIONS = [
   { id: 'deployment', label: 'Despliegue e Infraestructura', icon: <TerminalIcon className="w-5 h-5"/>, topic: "Deployment process, CI/CD pipeline, and required infrastructure." },
 ];
 
+const DIDACTIC_FUNCTIONS = [
+  { id: '', label: 'Seleccione una función...' },
+  { id: 'summary', label: 'Resumen Ejecutivo', func: generateExecutiveSummary },
+  { id: 'related-work', label: 'Trabajo Relacionado', func: generateRelatedWork },
+  { id: 'glossary', label: 'Glosario Técnico', func: generateGlossary },
+  { id: 'audit', label: 'Check-list de Auditoría', func: generateAuditChecklist },
+  { id: 'index', label: 'Índice Analítico', func: generateAnalyticalIndex },
+];
+
 const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [repoUrl, setRepoUrl] = useState('');
   const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({});
@@ -27,6 +47,12 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
   const [generatedContent, setGeneratedContent] = useState('');
   const [progressMessage, setProgressMessage] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState('es');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+  const [didacticFormat, setDidacticFormat] = useState<string>('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
 
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -58,6 +84,8 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
 
     setIsLoading(true);
     setGeneratedContent('');
+    setTranslatedContent(null);
+    setDidacticFormat('');
     setProgressMessage('Iniciando análisis...');
 
     const sectionsToGenerate = SECTIONS.filter(s => selectedSections[s.id]);
@@ -87,21 +115,78 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
     }
   }, [canGenerate, repoUrl, selectedSections]);
 
+  const handleUpdateDocument = useCallback(async () => {
+    if (!didacticFormat || !generatedContent || !repoUrl) return;
+
+    const selectedDidactic = DIDACTIC_FUNCTIONS.find(f => f.id === didacticFormat);
+    if (!selectedDidactic || !selectedDidactic.func) return;
+
+    setIsUpdating(true);
+    setUpdateMessage(`Generando ${selectedDidactic.label}...`);
+
+    try {
+        let newSectionContent = '';
+        if (didacticFormat === 'related-work' || didacticFormat === 'audit') {
+            const func = selectedDidactic.func as (repoUrl: string, text: string) => Promise<string>;
+            newSectionContent = await func(repoUrl, generatedContent);
+        } else {
+            const func = selectedDidactic.func as (text: string) => Promise<string>;
+            newSectionContent = await func(generatedContent);
+        }
+        
+        const newTotalContent = `${generatedContent}\n\n---\n\n### ${selectedDidactic.label}\n\n${newSectionContent}`;
+        setGeneratedContent(newTotalContent);
+
+        if (translatedContent) {
+            const targetLangLabel = ARGOS_LANGUAGES.find(l => l.value === targetLanguage)?.label || targetLanguage;
+            setUpdateMessage(`Retraduciendo documento actualizado a ${targetLangLabel}...`);
+            const retranslatedResult = await translateFullDocument(newTotalContent, targetLanguage);
+            setTranslatedContent(retranslatedResult);
+        }
+        
+        setDidacticFormat('');
+    } catch (error) {
+        console.error("Failed to update document with didactic format:", error);
+        alert("No se pudo agregar la sección seleccionada.");
+    } finally {
+        setIsUpdating(false);
+        setUpdateMessage('');
+    }
+  }, [didacticFormat, generatedContent, repoUrl, translatedContent, targetLanguage]);
+
+  const handleTranslate = useCallback(async () => {
+    if (!generatedContent || !targetLanguage) return;
+
+    setIsTranslating(true);
+    try {
+        const result = await translateFullDocument(generatedContent, targetLanguage);
+        setTranslatedContent(result);
+    } catch (error) {
+        console.error("Translation failed", error);
+        alert("La traducción ha fallado. Por favor, inténtelo de nuevo.");
+    } finally {
+        setIsTranslating(false);
+    }
+  }, [generatedContent, targetLanguage]);
+
+  const contentToDisplay = useMemo(() => translatedContent ?? generatedContent, [translatedContent, generatedContent]);
+
   const handleCopy = () => {
-    if (!generatedContent) return;
-    navigator.clipboard.writeText(generatedContent).then(() => {
+    if (!contentToDisplay) return;
+    navigator.clipboard.writeText(contentToDisplay).then(() => {
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     });
   };
 
   const handleDownload = () => {
-    if (!generatedContent) return;
-    const blob = new Blob([generatedContent], { type: 'text/markdown;charset=utf-8' });
+    if (!contentToDisplay) return;
+    const blob = new Blob([contentToDisplay], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const repoName = repoUrl.split('/').pop() || 'document';
-    link.download = `technical_doc_${repoName}.md`;
+    const langSuffix = translatedContent ? `_${targetLanguage}` : '';
+    link.download = `technical_doc_${repoName}${langSuffix}.md`;
     link.href = url;
     document.body.appendChild(link);
     link.click();
@@ -157,6 +242,55 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
                             ))}
                         </div>
                     </div>
+                    <div>
+                        <label htmlFor="target-language" className="block text-sm font-medium text-gray-300 mb-2">Idioma del Documento Final</label>
+                        <select
+                            id="target-language"
+                            value={targetLanguage}
+                            onChange={(e) => setTargetLanguage(e.target.value)}
+                            disabled={isLoading || isTranslating}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        >
+                            {ARGOS_LANGUAGES.filter(lang => lang.value !== 'all').map(lang => (
+                                <option key={lang.value} value={lang.value}>{lang.label}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleTranslate}
+                            disabled={!generatedContent || isLoading || isTranslating}
+                            className="w-full mt-3 flex items-center justify-center gap-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg disabled:bg-slate-500/50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isTranslating ? <SpinnerIcon className="w-5 h-5"/> : <TranslateIcon className="w-5 h-5"/>}
+                            {isTranslating ? 'Traduciendo...' : 'Traducir Documento'}
+                        </button>
+                        {translatedContent && (
+                            <button onClick={() => setTranslatedContent(null)} className="w-full mt-2 text-sm text-sky-400 hover:underline">
+                                Mostrar Original
+                            </button>
+                        )}
+                    </div>
+                    <div>
+                        <label htmlFor="didactic-format" className="block text-sm font-medium text-gray-300 mb-2">Funciones Didácticas y Formatos Profesionales</label>
+                        <select
+                            id="didactic-format"
+                            value={didacticFormat}
+                            onChange={(e) => setDidacticFormat(e.target.value)}
+                            disabled={isLoading || isUpdating || !generatedContent}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
+                        >
+                            {DIDACTIC_FUNCTIONS.map(format => (
+                                <option key={format.id} value={format.id} disabled={format.id === ''}>{format.label}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleUpdateDocument}
+                            disabled={!didacticFormat || !generatedContent || isLoading || isUpdating}
+                            className="w-full mt-3 flex items-center justify-center gap-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg disabled:bg-slate-500/50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isUpdating ? <SpinnerIcon className="w-5 h-5"/> : <RefreshIcon className="w-5 h-5"/>}
+                            {isUpdating ? 'Actualizando...' : 'Actualizar Documento'}
+                        </button>
+                    </div>
                      <div className="mt-auto pt-4">
                         <button
                             onClick={handleGenerate}
@@ -178,10 +312,16 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
                                 <p className="mt-4 text-gray-300">{progressMessage}</p>
                             </div>
                         )}
-                        {generatedContent ? (
+                        {isUpdating && (
+                            <div className="absolute top-0 left-0 right-0 bg-sky-600/80 backdrop-blur-sm text-white p-2 text-center text-sm z-20 flex items-center justify-center shadow-lg">
+                                <SpinnerIcon className="w-4 h-4 mr-2" />
+                                {updateMessage}
+                            </div>
+                        )}
+                        {contentToDisplay ? (
                             <textarea
                                 readOnly
-                                value={generatedContent}
+                                value={contentToDisplay}
                                 className="w-full h-full p-6 bg-transparent text-gray-300 resize-none focus:outline-none font-mono text-sm leading-relaxed"
                             />
                         ) : (
@@ -195,7 +335,7 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
                     <footer className="flex items-center justify-end p-4 border-t border-slate-800 flex-shrink-0 gap-3">
                         <button
                             onClick={handleCopy}
-                            disabled={!generatedContent || isLoading}
+                            disabled={!contentToDisplay || isLoading}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
                         >
                             {isCopied ? <CheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
@@ -203,7 +343,7 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
                         </button>
                         <button
                             onClick={handleDownload}
-                            disabled={!generatedContent || isLoading}
+                            disabled={!contentToDisplay || isLoading}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
                         >
                             <DownloadIcon className="w-5 h-5"/>
