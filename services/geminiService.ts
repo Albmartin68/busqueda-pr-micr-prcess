@@ -164,7 +164,7 @@ const fetchCategoryResults = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        systemInstruction: `You are a highly advanced search engine system called 'Micro-Process Document Search'. Your purpose is to find and validate content from various sources for a specific category. You must return the results in a strict JSON format (an array of items) that adheres to the user-provided schema.`,
+        systemInstruction: `You are a highly advanced search engine system called 'Plataforma de Estudio Multimodal'. Your purpose is to find and validate content from various sources for a specific category. You must return the results in a strict JSON format (an array of items) that adheres to the user-provided schema.`,
       },
     });
     

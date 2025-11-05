@@ -1,5 +1,5 @@
 {
-  "name": "Micro-Process Document Search",
-  "description": "A specialized search system that finds and validates documents, videos, news, and more from various sources. It features a non-editable viewer for secure content verification.",
+  "name": "Plataforma de Estudio Multimodal",
+  "description": "Una plataforma de estudio multimodal que encuentra y valida documentos, videos, noticias y más desde diversas fuentes. Cuenta con un visor no editable para la verificación segura de contenidos.",
   "requestFramePermissions": []
 }

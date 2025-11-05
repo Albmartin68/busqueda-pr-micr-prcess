@@ -15,6 +15,7 @@ import TemplateGeneratorModal from './components/TemplateGeneratorModal';
 import WorkbenchModal from './components/WorkbenchModal';
 import EditorPlusModal from './components/EditorPlusModal';
 import TechnicalDocGeneratorModal from './components/TechnicalDocGeneratorModal';
+import InteractiveGuideModal from './components/InteractiveGuideModal';
 
 export default function App(): React.ReactElement {
   const [query, setQuery] = useState<string>('');
@@ -29,6 +30,7 @@ export default function App(): React.ReactElement {
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [isEditorPlusOpen, setIsEditorPlusOpen] = useState<boolean>(false);
   const [isTechnicalDocGeneratorOpen, setIsTechnicalDocGeneratorOpen] = useState<boolean>(false);
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState<number>(0);
   const [libraryQuery, setLibraryQuery] = useState<string>('');
   const timerRef = useRef<number | null>(null);
@@ -102,6 +104,7 @@ export default function App(): React.ReactElement {
         onWorkbenchClick={() => setIsWorkbenchOpen(true)}
         onEditorPlusClick={() => setIsEditorPlusOpen(true)}
         onTechnicalDocGeneratorClick={() => setIsTechnicalDocGeneratorOpen(true)}
+        onGuideClick={() => setIsGuideOpen(true)}
       />
       <main className="container mx-auto p-4 md:p-6">
         <div className="bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 max-w-5xl mx-auto">
@@ -147,7 +150,7 @@ export default function App(): React.ReactElement {
 
             {!results && !isLoading && (
                  <div className="flex flex-col items-center justify-center h-64 bg-slate-800/50 rounded-lg text-center p-4">
-                    <h3 className="text-xl font-semibold text-white mb-2">Bienvenido a Micro-Process Search</h3>
+                    <h3 className="text-xl font-semibold text-white mb-2">Bienvenido a la Plataforma de Estudio Multimodal</h3>
                     <p className="text-gray-400 max-w-md">Ingrese una consulta arriba y use los filtros para encontrar documentos validados, videos, noticias y más de todo el mundo.</p>
                 </div>
             )}
@@ -191,6 +194,12 @@ export default function App(): React.ReactElement {
       {isTechnicalDocGeneratorOpen && (
         <TechnicalDocGeneratorModal
           onClose={() => setIsTechnicalDocGeneratorOpen(false)}
+        />
+      )}
+
+      {isGuideOpen && (
+        <InteractiveGuideModal
+          onClose={() => setIsGuideOpen(false)}
         />
       )}
     </div>
