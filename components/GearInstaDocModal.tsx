@@ -10,7 +10,7 @@ import { RefreshIcon } from './icons/RefreshIcon';
 import { TranslateIcon } from './icons/TranslateIcon';
 import { ARGOS_LANGUAGES } from '../constants';
 
-interface GearInstaDocModalProps {
+interface TechnicalDocGeneratorModalProps {
   onClose: () => void;
 }
 
@@ -24,7 +24,7 @@ const ANALYSIS_STEPS = [
   { id: 'adr', title: 'Decisiones de Arquitectura (ADR)', prompt: 'Assuming this repository follows good architectural practices, describe some likely Architectural Decision Records (ADRs) that would exist. For example, the choice of a framework, a database, or a state management library.' },
 ];
 
-const GearInstaDocModal: React.FC<GearInstaDocModalProps> = ({ onClose }) => {
+const TechnicalDocGeneratorModal: React.FC<TechnicalDocGeneratorModalProps> = ({ onClose }) => {
   const [stage, setStage] = useState<Stage>('config');
   const [repoUrl, setRepoUrl] = useState<string>('https://github.com/google-gemini/generative-ai-docs');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -69,12 +69,12 @@ const GearInstaDocModal: React.FC<GearInstaDocModalProps> = ({ onClose }) => {
         const sections = await Promise.all(analysisPromises);
 
         setProcessingMessage('Ensamblando documento final...');
-        const finalReport = `# Análisis Técnico del Repositorio: ${repoUrl.split('/').slice(-2).join('/')}\n\n**Generado por Gear-InstaDoc el ${new Date().toLocaleString()}**\n\n---\n\n${sections.join('\n\n---\n\n')}`;
+        const finalReport = `# Análisis Técnico del Repositorio: ${repoUrl.split('/').slice(-2).join('/')}\n\n**Generado por el Generador de Documentos Técnicos el ${new Date().toLocaleString()}**\n\n---\n\n${sections.join('\n\n---\n\n')}`;
         
         setReportContent(finalReport);
         setStage('complete');
     } catch (error) {
-        console.error("Error generating InstaDoc:", error);
+        console.error("Error generating technical document:", error);
         setStage('error');
         setErrorMessage(error instanceof Error ? error.message : 'Ocurrió un error desconocido durante el análisis.');
     } finally {
@@ -119,7 +119,7 @@ const GearInstaDocModal: React.FC<GearInstaDocModalProps> = ({ onClose }) => {
     a.href = url;
     const repoName = repoUrl.split('/').pop()?.replace('.git', '') || 'document';
     const langSuffix = translatedReportContent ? `_${targetLanguage}` : '';
-    a.download = `Gear-InstaDoc-${repoName}${langSuffix}.md`;
+    a.download = `DocTecnico-${repoName}${langSuffix}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -239,7 +239,7 @@ const GearInstaDocModal: React.FC<GearInstaDocModalProps> = ({ onClose }) => {
         <header className="flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
           <h2 className="text-xl font-bold text-white flex items-center gap-3">
             <GearIcon className="w-6 h-6 text-sky-400" />
-            Gear-InstaDoc: Generador de Documentación Técnica
+            Generador de Documentos Técnicos
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 transition-colors">
             <XIcon className="w-5 h-5" />
@@ -253,4 +253,4 @@ const GearInstaDocModal: React.FC<GearInstaDocModalProps> = ({ onClose }) => {
   );
 };
 
-export default GearInstaDocModal;
+export default TechnicalDocGeneratorModal;
