@@ -33,7 +33,12 @@ const summarizeFinding = async (query: string, paragraph: string): Promise<strin
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
-        return response.text.trim();
+        const resultText = response.text?.trim();
+        if (resultText) {
+            return resultText;
+        }
+        // Fallback if result is empty or undefined
+        return paragraph.length > 250 ? paragraph.substring(0, 247) + "..." : paragraph;
     } catch (error) {
         console.error("Error summarizing finding:", error);
         // Fallback to a truncated version of the paragraph if summarization fails

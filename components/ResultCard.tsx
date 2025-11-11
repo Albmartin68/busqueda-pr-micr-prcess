@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchResultItem, DocumentResult } from '../types';
-import { DocIcon, DocxIcon, XlsxIcon, PptxIcon } from './icons/FileIcons';
+import { DocIcon, DocxIcon, XlsxIcon, PptxIcon, EpubIcon, HtmlIcon, TxtIcon } from './icons/FileIcons';
 import { VideoIcon } from './icons/VideoIcon';
 import { NewsIcon } from './icons/NewsIcon';
 import { EyeIcon } from './icons/EyeIcon';
@@ -21,6 +21,9 @@ const FileTypeIcon: React.FC<{ type: string }> = ({ type }) => {
         case 'DOCX': return <DocxIcon className="w-5 h-5" />;
         case 'XLSX': return <XlsxIcon className="w-5 h-5" />;
         case 'PPTX': return <PptxIcon className="w-5 h-5" />;
+        case 'EPUB': return <EpubIcon className="w-5 h-5" />;
+        case 'HTML': return <HtmlIcon className="w-5 h-5" />;
+        case 'TXT': return <TxtIcon className="w-5 h-5" />;
         default: return <DocIcon className="w-5 h-5" />;
     }
 };

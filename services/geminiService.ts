@@ -15,7 +15,7 @@ const schemas: Record<keyof SearchResult, any> = {
         url: { type: Type.STRING },
         snippet: { type: Type.STRING },
         source: { type: Type.STRING },
-        type: { type: Type.STRING, description: "File type: PDF, DOCX, XLSX, or PPTX" },
+        type: { type: Type.STRING, description: "File type: PDF, DOCX, XLSX, PPTX, EPUB, HTML, or TXT" },
         language: { type: Type.STRING },
         country: { type: Type.STRING },
         certification: { type: Type.STRING },
@@ -134,27 +134,25 @@ const fetchCategoryResults = async (
     ? `For the 'documents' category, please generate plausible full-text content for the 'content' field. The content can be markdown, including image tags like ![alt text](url).`
     : '';
 
+  // FIX: Explicitly type `value` as `any` to resolve TypeScript error about unknown properties.
+  const propertiesDescription = Object.entries(schema.items.properties).map(([key, value]: [string, any]) => `- \`${key}\`: ${value.description || value.type}`).join('\n');
+
   const prompt = `
     Based on the following query and filters, generate a comprehensive list of search results for the '${String(category)}' category.
     Query: "${query}"
     Filters: ${JSON.stringify(filters, null, 2)}
     
-    **CRITICAL Language Instructions**: ${languageInstruction}
+    **CRITICAL Instructions**:
+    1.  **Use Web Search**: You MUST use your integrated Google Search tool to find REAL, LIVE, and VERIFIABLE online sources for each result.
+    2.  **Real URLs**: The 'url' field for each item must be a direct, working hyperlink to the source you found. DO NOT invent, hallucinate, or create placeholder URLs.
+    3.  **Strict JSON Output**: Your entire response MUST be a single, valid JSON array of objects. Do not include any text, explanations, or markdown before or after the JSON array. If no results are found, you MUST return an empty array \`[]\`.
+    4.  **JSON Structure**: Each object in the array must conform to the following structure:
+        ${propertiesDescription}
+    5.  **Language**: ${languageInstruction}
+    6.  **ID and Category**: The 'id' for each item must be a unique string (e.g., '${String(category).slice(0, 3)}-1'). The 'category' must be exactly '${String(category)}'.
     
-    **CRITICAL URL Instructions**: For the 'url' field, you MUST generate a valid, publicly accessible, and realistic-looking URL. For example:
-    - For 'documents', you could link to public PDF repositories (like arXiv.org), government publications, or university archives.
-    - For 'videos', use valid YouTube or Vimeo URLs (e.g., https://www.youtube.com/watch?v=...).
-    - For 'news', use URLs from well-known news agencies (like reuters.com, apnews.com, bbc.com).
-    - For 'forums', use links to sites like Reddit, Stack Overflow, or other public forums.
-    Do NOT use placeholder URLs like 'example.com', 'your-site.com', or generic non-existent links. The URLs should look real even if they are illustrative.
-
-    Generate a list of relevant and varied results for the '${String(category)}' category. Prioritize quality over quantity.
     Ensure the generated data is realistic and relevant to the query. 
     ${documentSpecificInstructions}
-    The 'id' for each item should be a unique string, for example '${String(category).slice(0, 3)}-1', '${String(category).slice(0, 3)}-123', etc.
-    The 'category' for each item must be exactly '${String(category)}'.
-    Adhere strictly to the provided JSON schema for the response. Do not add any extra text or explanations outside of the JSON object.
-    If no results are found, you MUST return an empty array, and nothing else.
   `;
 
   try {
@@ -162,15 +160,25 @@ const fetchCategoryResults = async (
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        systemInstruction: `You are a highly advanced search engine system called 'Plataforma de Estudio Multimodal'. Your purpose is to find and validate content from various sources for a specific category. You must return the results in a strict JSON format (an array of items) that adheres to the user-provided schema.`,
+        tools: [{googleSearch: {}}], // Use Google Search for grounding
+        systemInstruction: `You are a highly advanced search engine system called 'Plataforma de Estudio Multimodal'. Your purpose is to find real, live, and validated content from various sources for a specific category using your web search capabilities. You must return the results in a strict JSON format (an array of items) that adheres to the user-provided structure. Do not add any extra text or explanations.`,
       },
     });
     
-    const jsonText = response.text.trim();
-    if (!jsonText) return [];
-    return JSON.parse(jsonText);
+    const jsonText = response.text?.trim();
+    if (!jsonText) {
+        console.warn(`Gemini API returned no text for category '${String(category)}'.`);
+        return [];
+    }
+    // Basic cleanup in case the model wraps the JSON in markdown
+    const cleanedJsonText = jsonText.replace(/^```json\s*|```\s*$/g, '');
+    
+    // Prevent JSON.parse from failing on an empty string
+    if (cleanedJsonText.trim() === '') {
+        return [];
+    }
+
+    return JSON.parse(cleanedJsonText);
   } catch (error) {
     console.error(`Error fetching search results for category '${String(category)}' from Gemini API:`, error);
     return [];
@@ -240,7 +248,7 @@ export const translateDocumentContent = async (content: string, targetLanguage: 
         return ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: `Translate the following text to ${targetLanguageLabel}. Do not add any extra explanations, just provide the raw translation:\n\n---\n\n${chunk}`,
-        }).then(response => response.text);
+        }).then(response => response.text ?? '');
     });
 
     try {
@@ -270,7 +278,7 @@ export const summarizeContent = async (content: string): Promise<string> => {
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
-        return response.text;
+        return response.text ?? '';
     } catch (error) {
         console.error("Error summarizing content with Gemini API:", error);
         throw new Error("Failed to summarize document content.");
@@ -293,7 +301,7 @@ export const generateImageCaption = async (base64Image: string, mimeType: string
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: prompt }, imagePart] },
       });
-      return response.text;
+      return response.text ?? "Image description not available.";
     } catch (error) {
       console.error("Error generating image caption:", error);
       return "Image description not available.";
@@ -316,7 +324,7 @@ export const extractTextFromImage = async (base64Image: string, mimeType: string
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }, imagePart] },
         });
-        return response.text;
+        return response.text ?? "Could not extract text from image.";
     } catch (error) {
         console.error("Error extracting text from image:", error);
         return "Could not extract text from image.";
@@ -345,7 +353,7 @@ export const analyzeRepository = async (repoUrl: string, analysisTopic: string):
                 systemInstruction: `You are a world-class senior software architect and technical writer. Your task is to analyze a given public GitHub repository and generate sections of a professional technical document. You must infer the project's architecture, purpose, and potential issues from the repository's structure and any available code snippets or documentation, as you do not have direct file access.`,
             },
         });
-        return response.text;
+        return response.text ?? `### Error Analyzing Repository\n\nCould not generate the section for "${analysisTopic}".\n\n**Reason:** No content was returned by the model.`;
     } catch (error) {
         console.error(`Error analyzing repository for topic '${analysisTopic}':`, error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -376,7 +384,7 @@ export const translateFullDocument = async (content: string, targetLanguage: str
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
-        return response.text;
+        return response.text ?? '';
     } catch (error) {
         console.error(`Error translating full document to ${targetLanguageLabel}:`, error);
         throw new Error(`Failed to translate the document to ${targetLanguageLabel}.`);
@@ -401,7 +409,7 @@ export const generateExecutiveSummary = async (documentText: string): Promise<st
     `;
     try {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
-        return response.text;
+        return response.text ?? "Error: Could not generate summary.";
     } catch (error) {
         console.error("Error generating executive summary:", error);
         return "Error: Could not generate summary.";
@@ -425,7 +433,7 @@ export const generateRelatedWork = async (repoUrl: string, documentText: string)
     `;
     try {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
-        return response.text;
+        return response.text ?? "Error: Could not generate related work section.";
     } catch (error) {
         console.error("Error generating related work:", error);
         return "Error: Could not generate related work section.";
@@ -448,7 +456,7 @@ export const generateGlossary = async (documentText: string): Promise<string> =>
     `;
     try {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
-        return response.text;
+        return response.text ?? "Error: Could not generate glossary.";
     } catch (error) {
         console.error("Error generating glossary:", error);
         return "Error: Could not generate glossary.";
@@ -471,7 +479,7 @@ export const generateAuditChecklist = async (repoUrl: string, documentText: stri
     `;
     try {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
-        return response.text;
+        return response.text ?? "Error: Could not generate audit checklist.";
     } catch (error) {
         console.error("Error generating audit checklist:", error);
         return "Error: Could not generate audit checklist.";
@@ -494,7 +502,7 @@ export const generateAnalyticalIndex = async (documentText: string): Promise<str
     `;
     try {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
-        return response.text;
+        return response.text ?? "Error: Could not generate analytical index.";
     } catch (error) {
         console.error("Error generating analytical index:", error);
         return "Error: Could not generate analytical index.";

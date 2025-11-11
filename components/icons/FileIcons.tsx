@@ -50,3 +50,28 @@ export const PptxIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
         <path d="M10 12h2a2 2 0 1 1 0 4h-2v-4Z"/>
     </FileIconBase>
 );
+
+// EPUB Document Icon
+export const EpubIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <FileIconBase {...props}>
+        <path d="M14 12H9v6h5" />
+        <path d="M9 15h4" />
+    </FileIconBase>
+);
+
+// HTML Document Icon
+export const HtmlIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <FileIconBase {...props}>
+        <polyline points="10 12 8 14 10 16" />
+        <polyline points="14 12 16 14 14 16" />
+        <line x1="13" y1="17" x2="11" y2="11" />
+    </FileIconBase>
+);
+
+// TXT Document Icon
+export const TxtIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <FileIconBase {...props}>
+        <polyline points="8 12 16 12"/>
+        <line x1="12" y1="12" x2="12" y2="18"/>
+    </FileIconBase>
+);

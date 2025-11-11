@@ -44,6 +44,9 @@ export const DOCUMENT_TYPE_OPTIONS: {value: DocumentType, label: string}[] = [
     { value: 'DOCX', label: 'Word (.docx)' },
     { value: 'XLSX', label: 'Excel (.xlsx)' },
     { value: 'PPTX', label: 'PowerPoint (.pptx)' },
+    { value: 'EPUB', label: 'ePub (.epub)' },
+    { value: 'HTML', label: 'Página Web (.html)' },
+    { value: 'TXT', label: 'Texto Plano (.txt)' },
 ];
 
 export const COUNTRY_OPTIONS: {value: string, label: string}[] = [

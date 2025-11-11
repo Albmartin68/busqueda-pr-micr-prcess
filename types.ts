@@ -11,7 +11,7 @@ export interface SearchResultItemBase {
 
 export interface DocumentResult extends SearchResultItemBase {
   category: 'documents';
-  type: 'PDF' | 'DOCX' | 'XLSX' | 'PPTX';
+  type: 'PDF' | 'DOCX' | 'XLSX' | 'PPTX' | 'EPUB' | 'HTML' | 'TXT';
   language: string;
   country: string;
   certification: string;
@@ -59,7 +59,7 @@ export interface SearchResult {
 }
 
 export type DateRange = 'all' | 'past_day' | 'past_week' | 'past_month' | 'past_year';
-export type DocumentType = 'all' | 'PDF' | 'DOCX' | 'XLSX' | 'PPTX';
+export type DocumentType = 'all' | 'PDF' | 'DOCX' | 'XLSX' | 'PPTX' | 'EPUB' | 'HTML' | 'TXT';
 
 export interface FilterOptions {
     dateRange: DateRange;

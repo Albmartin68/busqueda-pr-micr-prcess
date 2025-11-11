@@ -59,10 +59,8 @@ export default function App(): React.ReactElement {
       setError('Por favor, ingrese una consulta de búsqueda.');
       return;
     }
-    // Update the state so the search bar reflects the current query
-    if (query !== searchQuery) {
-      setQuery(searchQuery);
-    }
+    // Always update the state so the search bar reflects the current query
+    setQuery(searchQuery);
 
     setSearchTime(0);
     setIsLoading(true);
@@ -77,10 +75,42 @@ export default function App(): React.ReactElement {
     } finally {
       setIsLoading(false);
     }
-  }, [filters, query]);
+  }, [filters]);
+
+  const handleGlobalSearch = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setError('Por favor, ingrese una consulta de búsqueda.');
+      return;
+    }
+    // Always update the state so the search bar reflects the current query
+    setQuery(searchQuery);
+
+    setSearchTime(0);
+    setIsLoading(true);
+    setError(null);
+    setResults(null);
+    
+    // Force global filters for this search type, ignoring user settings
+    const globalFilters: FilterOptions = {
+        dateRange: 'all',
+        documentType: 'all',
+        country: 'all',
+        language: 'all',
+    };
+
+    try {
+      const searchResults = await fetchSearchResults(searchQuery, globalFilters);
+      setResults(searchResults);
+    } catch (e) {
+      console.error(e);
+      setError('Ocurrió un error al obtener los resultados. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const handleSpecializedSearch = (prompt: string) => {
-    handleSearch(prompt);
+    handleGlobalSearch(prompt);
     setIsTemplateModalOpen(false);
   };
 
