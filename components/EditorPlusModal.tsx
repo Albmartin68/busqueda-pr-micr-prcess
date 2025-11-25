@@ -639,12 +639,13 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
             {/* Editable Area */}
             <div className="flex-grow overflow-y-auto p-4 relative" onDragOver={e => { e.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop} onClick={handleEditorClick}>
               <div ref={editorRef} className="document-editor-page" contentEditable={true} onInput={updateEditorState} suppressContentEditableWarning={true}>
-                  <h1>Título del Documento</h1>
-                  <p>Comience a escribir su contenido aquí. Puede usar la barra de herramientas para dar formato al texto, agregar encabezados, listas y más. Arrastre una imagen para agregarla al documento.</p>
+                  <p><br/></p>
+                  {references.size > 0 && (
                   <div id="references-section" contentEditable="false" className="mt-12 pt-6 border-t border-slate-300">
                     <h2 style={{fontSize: '16pt', fontWeight: 'bold'}}>Referencias</h2>
                     {Array.from(references.values()).map((ref, i) => <p key={i} style={{fontSize: '11pt', margin: '0.5em 0'}}>{ref}</p>)}
                   </div>
+                  )}
               </div>
               {isDragging && <div className="drag-over-overlay"><span>Soltar imagen para añadir</span></div>}
               <Toast {...toast} />
