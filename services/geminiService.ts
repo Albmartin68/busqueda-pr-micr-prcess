@@ -285,6 +285,28 @@ export const summarizeContent = async (content: string): Promise<string> => {
     }
 };
 
+export const generateCustomSummary = async (content: string, promptInstruction: string): Promise<string> => {
+    const ai = getAI();
+    const prompt = `
+        ${promptInstruction}
+
+        --- DOCUMENT CONTENT TO SUMMARIZE ---
+        ${content}
+        --- END OF CONTENT ---
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro', // Use Pro model for higher quality complex summaries
+            contents: prompt,
+        });
+        return response.text ?? 'No se pudo generar el resumen.';
+    } catch (error) {
+        console.error("Error generating custom summary:", error);
+        throw new Error("Failed to generate custom summary.");
+    }
+};
+
 export const generateImageCaption = async (base64Image: string, mimeType: string): Promise<string> => {
     const ai = getAI();
     const prompt = "Describe this image for a document caption. Be concise and descriptive.";

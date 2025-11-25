@@ -1,3 +1,4 @@
+
 export type ActiveTab = 'all' | 'documents' | 'videos' | 'news' | 'forums' | 'events' | 'magazines';
 
 export interface SearchResultItemBase {
@@ -94,4 +95,29 @@ export interface WorkbenchFlashcard {
   queryMatch: string; // The specific term that was matched
   score: number; // A relevance score, e.g., 0.95
   paragraphId: string; // e.g., 'doc-1-p-42'
+}
+
+// Editor Plus Settings Types
+export type SummaryTemplateType = 'academic' | 'executive' | 'creative' | 'technical' | 'personalized';
+
+export interface SummarySettings {
+    template: SummaryTemplateType;
+    sourceFile?: File; // The document to be summarized
+    customConfig?: {
+        focus: string;
+        tone: string;
+        length: string;
+        audience: string;
+    };
+}
+
+export type FormatStandardType = 'APA7' | 'Vancouver' | 'ISO690' | 'MLA9' | 'Institutional';
+
+export interface FormatSettings {
+    standard: FormatStandardType;
+    fontFamily: string;
+    fontSize: string;
+    lineHeight: string;
+    margins: string;
+    citationStyle: string;
 }

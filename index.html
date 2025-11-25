@@ -153,6 +153,75 @@
       .user-avatar-stack > * + * {
         margin-left: -0.75rem; /* -ml-3 */
       }
+
+      /* Styles for Prompt Templates in AddToNotebookModal */
+      details {
+        background-color: #334155; /* slate-700 */
+        border: 1px solid #475569; /* slate-600 */
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        color: #e2e8f0; /* slate-200 */
+      }
+      summary {
+        padding: 1rem;
+        cursor: pointer;
+        color: #e2e8f0; /* slate-200 */
+        list-style: none;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      details[open] > summary {
+        border-bottom: 1px solid #475569; /* slate-600 */
+      }
+      details > .details-content {
+        padding: 1rem;
+        background-color: #1e293b; /* slate-800 */
+        border-bottom-left-radius: 7px;
+        border-bottom-right-radius: 7px;
+      }
+      details h3 {
+        color: #94a3b8; /* slate-400 */
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+      }
+      details pre {
+        background-color: #0f172a; /* slate-900 */
+        padding: 0.75rem;
+        border-radius: 6px;
+        border: 1px solid #334155; /* slate-700 */
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.875rem;
+        color: #cbd5e1; /* slate-300 */
+        margin-top: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      details code {
+          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+      }
+      details hr {
+          border-color: #475569; /* slate-600 */
+          margin: 1.5rem 0;
+      }
+      details table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 1rem;
+          font-size: 0.9rem;
+      }
+      details th, details td {
+          border: 1px solid #475569; /* slate-600 */
+          padding: 0.5rem;
+          text-align: left;
+      }
+      details th {
+          background-color: #334155; /* slate-700 */
+          font-weight: bold;
+      }
 </style>
 </head>
   <body class="bg-slate-900 text-white">

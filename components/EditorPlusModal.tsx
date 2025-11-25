@@ -8,14 +8,18 @@ import { SpinnerIcon } from './icons/SpinnerIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { FilePlusIcon } from './icons/FilePlusIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { GearIcon } from './icons/GearIcon'; // Imported GearIcon
 import { assetService } from '../services/editorPlus/assetService';
 import { renderService } from '../services/editorPlus/renderService';
 import { docService } from '../services/editorPlus/docService';
+import { generateCustomSummary } from '../services/geminiService'; // Import the new service
 import { EditorPlusIcon } from './icons/EditorPlusIcon';
 import { HistoryIcon } from './icons/HistoryIcon';
 import { UploadCloudIcon } from './icons/UploadCloudIcon';
+import { ClipboardIcon } from './icons/ClipboardIcon';
 import PublishModal from './PublishModal';
-
+import EditorSettingsModal, { TEMPLATES } from './EditorSettingsModal'; // Imported settings modal and templates
+import { SummarySettings, FormatSettings } from '../types'; // Imported types
 
 // --- TYPE DEFINITIONS ---
 interface EditorPlusModalProps {
@@ -41,6 +45,13 @@ export interface Asset {
 }
 export type CitationStyle = 'APA' | 'MLA' | 'Chicago';
 type SyncStatus = 'synced' | 'saving' | 'edited' | 'offline';
+
+// Declare global PDF lib
+declare global {
+  interface Window {
+    pdfjsLib: any;
+  }
+}
 
 // --- HELPER & UTILITY COMPONENTS ---
 const ToolbarButton: React.FC<{ onMouseDown: (e: React.MouseEvent) => void; children: React.ReactNode; title: string, active?: boolean }> = ({ onMouseDown, children, title, active }) => (
@@ -86,9 +97,28 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isCitationModalOpen, setIsCitationModalOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // New state for Settings Modal
+
+  // Summary State
+  const [summaryContent, setSummaryContent] = useState<string>('');
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   // Cloud-connected state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
+
+  // Settings State
+  const [summarySettings, setSummarySettings] = useState<SummarySettings>({
+      template: 'academic',
+      customConfig: { focus: '', tone: 'Formal', length: '', audience: '' }
+  });
+  const [formatSettings, setFormatSettings] = useState<FormatSettings>({
+      standard: 'APA7',
+      fontFamily: 'Times New Roman',
+      fontSize: '12pt',
+      lineHeight: '2.0',
+      margins: '2.54cm',
+      citationStyle: '(Autor, Año)'
+  });
 
 
   // Effects
@@ -99,6 +129,128 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  // Apply default styles on mount
+  useEffect(() => {
+      if (editorRef.current) {
+          applyFormatStyles(formatSettings);
+      }
+  }, []);
+
+  const applyFormatStyles = (settings: FormatSettings) => {
+      if (!editorRef.current) return;
+      const editor = editorRef.current;
+      editor.style.fontFamily = settings.fontFamily;
+      editor.style.fontSize = settings.fontSize;
+      editor.style.lineHeight = settings.lineHeight;
+      editor.style.padding = settings.margins;
+      // Note: In a real app, this would also need to update a CSS class or injected stylesheet to handle @page properties for PDF export.
+  };
+
+  const handleApplySettings = (newSummary: SummarySettings, newFormat: FormatSettings) => {
+      setSummarySettings(newSummary);
+      setFormatSettings(newFormat);
+      applyFormatStyles(newFormat);
+      showToast(`Ajustes aplicados: ${newFormat.standard}`, 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+  };
+  
+  const handleGenerateSummary = async (settings: SummarySettings) => {
+    if (!settings.sourceFile) {
+        showToast("Error: No se ha seleccionado un archivo fuente.", 3000, <XIcon className="w-5 h-5 text-red-400"/>);
+        return;
+    }
+
+    setSummarySettings(settings); // Update local state
+    setIsGeneratingSummary(true);
+    setActiveSidebarTab('resumen'); // Switch to summary tab to show loading/result
+    showToast("Analizando documento...", 0);
+
+    try {
+        // 1. Read file content
+        const text = await readFileContent(settings.sourceFile);
+        
+        if (!text || text.length < 50) {
+             throw new Error("El documento parece estar vacío o no se pudo extraer texto.");
+        }
+
+        showToast("Generando resumen con IA...", 0);
+
+        // 2. Determine prompt
+        let prompt = TEMPLATES.find(t => t.id === settings.template)?.prompt || "Generate a summary of this document.";
+        
+        if (settings.template === 'personalized' && settings.customConfig) {
+             prompt = `
+                Genera un resumen personalizado con los siguientes parámetros:
+                - Enfoque: ${settings.customConfig.focus}
+                - Audiencia: ${settings.customConfig.audience}
+                - Tono: ${settings.customConfig.tone}
+                - Extensión objetivo: ${settings.customConfig.length}
+             `;
+        }
+
+        // 3. Append Format Instruction
+        // This ensures the AI generates content structure that aligns with the selected format (e.g., APA).
+        prompt += `\n\n**INSTRUCCIÓN DE FORMATO Y ESTILO:**
+        El usuario ha seleccionado el estándar de formato: "${formatSettings.standard}".
+        Por favor, asegúrate de que la redacción, el tono y la estructura interna del resumen sean consistentes con las normas de ${formatSettings.standard}. 
+        Si el estándar requiere un lenguaje impersonal o secciones específicas, aplícalo rigurosamente.`;
+
+        // 4. Call Service
+        const summary = await generateCustomSummary(text, prompt);
+        setSummaryContent(summary);
+        showToast("Resumen generado exitosamente.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+
+    } catch (e) {
+        console.error("Summary generation failed", e);
+        const errorMsg = e instanceof Error ? e.message : "Error desconocido";
+        setSummaryContent(`Hubo un error al generar el resumen: ${errorMsg}. Por favor, verifique que el archivo no esté protegido o corrupto.`);
+        showToast("Error al generar resumen.", 3000, <XIcon className="w-5 h-5 text-red-400"/>);
+    } finally {
+        setIsGeneratingSummary(false);
+    }
+  };
+
+  const readFileContent = async (file: File): Promise<string> => {
+      // PDF Parsing logic using PDF.js
+      if (file.type === 'application/pdf') {
+          try {
+              if (!window.pdfjsLib) {
+                   // Fallback check in case script didn't load (though index.html has it)
+                   throw new Error("La librería PDF no está inicializada.");
+              }
+              
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await window.pdfjsLib.getDocument(arrayBuffer).promise;
+              let fullText = '';
+              
+              // Iterate over all pages
+              for (let i = 1; i <= pdf.numPages; i++) {
+                  const page = await pdf.getPage(i);
+                  const textContent = await page.getTextContent();
+                  const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                  fullText += pageText + '\n\n';
+              }
+              
+              if (!fullText.trim()) {
+                  return "Advertencia: Se detectó un PDF pero no se pudo extraer texto. Es posible que sea un documento escaneado (imagen).";
+              }
+              
+              return fullText;
+          } catch (e) {
+              console.error("PDF extraction error:", e);
+              throw new Error("Fallo al leer el PDF. Asegúrese de que el archivo es válido.");
+          }
+      } 
+      
+      // Standard Text Reading
+      return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = (e) => reject(new Error("Error al leer el archivo de texto."));
+          reader.readAsText(file);
+      });
+  };
+
 
   // --- EDITOR CORE & STATE UPDATES ---
   const handleSave = useCallback(async () => {
@@ -343,6 +495,20 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     return <div className="flex items-center gap-2">{icon}<span>{text}</span></div>;
   };
 
+  const handleCopySummary = () => {
+      navigator.clipboard.writeText(summaryContent);
+      showToast('Resumen copiado al portapapeles', 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+  };
+  
+  const handleInsertSummary = () => {
+      if (editorRef.current) {
+          editorRef.current.focus();
+          // Insert with simple blockquote, but rely on editor CSS to handle main formatting.
+          document.execCommand('insertHTML', false, `<blockquote>${summaryContent.replace(/\n/g, '<br/>')}</blockquote><p><br/></p>`);
+          updateEditorState();
+      }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-50 p-4" onClick={onClose}>
       <input type="file" ref={fileInputRef} onChange={handleAddAsset} accept="image/*" multiple className="hidden" />
@@ -363,6 +529,13 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                 <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white">
                     <DownloadIcon className="w-5 h-5" /> Exportar PDF
                 </button>
+                <button 
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-md bg-slate-700 hover:bg-slate-600 text-white"
+                  title="Ajustes de Formato y Resumen"
+                >
+                    <GearIcon className="w-5 h-5"/>
+                </button>
                 <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-slate-700"><XIcon className="w-5 h-5" /></button>
             </div>
           </div>
@@ -371,9 +544,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         {/* Main Content Area */}
         <main className="flex-grow flex overflow-hidden bg-slate-800">
           {/* Left Sidebar */}
-          <aside className="w-64 bg-slate-900/50 p-4 border-r border-slate-700 flex-shrink-0 flex flex-col">
+          <aside className="w-80 bg-slate-900/50 p-4 border-r border-slate-700 flex-shrink-0 flex flex-col">
             <div className="flex-shrink-0 flex border-b border-slate-700 mb-4">
-              {['Índice', 'Activos'].map(tab => (
+              {['Índice', 'Activos', 'Resumen'].map(tab => (
                 <button key={tab} onClick={() => setActiveSidebarTab(tab.toLowerCase())}
                   className={`flex-1 py-2 text-sm font-semibold ${activeSidebarTab === tab.toLowerCase() ? 'text-sky-400 border-b-2 border-sky-400' : 'text-gray-400 hover:text-white'}`}>
                   {tab}
@@ -408,6 +581,43 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                     <FilePlusIcon className="w-4 h-4"/> Añadir Imagen
                 </button>
               </div>
+            )}
+            {activeSidebarTab === 'resumen' && (
+               <div className="flex flex-col h-full animate-fade-in">
+                   {isGeneratingSummary ? (
+                       <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+                           <SpinnerIcon className="w-8 h-8 mb-2 text-sky-400"/>
+                           <p>Generando resumen...</p>
+                       </div>
+                   ) : summaryContent ? (
+                       <>
+                           <div 
+                              className="bg-slate-800 p-3 rounded-md border border-slate-700 overflow-y-auto flex-grow text-gray-300 whitespace-pre-wrap"
+                              style={{ 
+                                  fontFamily: formatSettings.fontFamily, 
+                                  fontSize: '0.85rem', // Smaller preview but respecting font
+                                  lineHeight: formatSettings.lineHeight 
+                              }}
+                           >
+                               {summaryContent}
+                           </div>
+                           <div className="mt-4 flex flex-col gap-2 flex-shrink-0">
+                               <button onClick={handleInsertSummary} className="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-md text-white text-sm font-semibold">
+                                   Insertar en Documento
+                               </button>
+                               <button onClick={handleCopySummary} className="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-md text-white text-sm flex items-center justify-center gap-2">
+                                   <ClipboardIcon className="w-4 h-4"/> Copiar
+                               </button>
+                           </div>
+                       </>
+                   ) : (
+                       <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+                           <BookOpenIcon className="w-12 h-12 mb-3 opacity-20"/>
+                           <p>No hay resumen generado.</p>
+                           <p className="text-xs mt-2">Vaya a Ajustes {'>'} Resumen con IA para crear uno.</p>
+                       </div>
+                   )}
+               </div>
             )}
           </aside>
 
@@ -492,6 +702,15 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                         <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsCitationModalOpen(false)} className="px-4 py-2 bg-slate-600 rounded">Cancelar</button><button type="submit" className="px-4 py-2 bg-sky-600 rounded">Insertar</button></div>
                     </form>
                  </div>
+              )}
+              {isSettingsModalOpen && (
+                  <EditorSettingsModal
+                      onClose={() => setIsSettingsModalOpen(false)}
+                      currentSummarySettings={summarySettings}
+                      currentFormatSettings={formatSettings}
+                      onApplySettings={handleApplySettings}
+                      onGenerateSummary={handleGenerateSummary}
+                  />
               )}
             </div>
           </div>
