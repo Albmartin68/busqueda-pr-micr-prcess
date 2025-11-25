@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { GearIcon } from './icons/GearIcon';
 import { SummarySettings, FormatSettings, SummaryTemplateType, FormatStandardType } from '../types';
-import { CheckIcon } from './icons/CheckIcon';
 import { ThesisIcon } from './icons/ThesisIcon';
 import { ApaIcon } from './icons/ApaIcon';
 import { UploadCloudIcon } from './icons/UploadCloudIcon';
@@ -89,43 +88,55 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
     const [summarySettings, setSummarySettings] = useState<SummarySettings>(currentSummarySettings);
     const [formatSettings, setFormatSettings] = useState<FormatSettings>(currentFormatSettings);
 
+    // --- Automatic Updates ---
+    
     const handleFormatChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value as FormatStandardType;
         const formatData = FORMATS.find(f => f.id === selectedId)?.details;
         if (formatData) {
             setFormatSettings(formatData);
+            // Automatically apply settings to parent
+            onApplySettings(summarySettings, formatData);
         }
     };
 
+    const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newTemplate = e.target.value as SummaryTemplateType;
+        const newSummarySettings = { ...summarySettings, template: newTemplate };
+        setSummarySettings(newSummarySettings);
+        // Automatically apply settings to parent
+        onApplySettings(newSummarySettings, formatSettings);
+    };
+
     const handleCustomConfigChange = (key: string, value: string) => {
-        setSummarySettings(prev => ({
-            ...prev,
-            customConfig: {
-                ...prev.customConfig!,
-                [key]: value
-            }
-        }));
+        const newConfig = { ...summarySettings.customConfig!, [key]: value };
+        const newSummarySettings = { ...summarySettings, customConfig: newConfig };
+        
+        setSummarySettings(newSummarySettings);
+        // Automatically apply settings to parent
+        onApplySettings(newSummarySettings, formatSettings);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setSummarySettings(prev => ({
-                ...prev,
+            const newSummarySettings = {
+                ...summarySettings,
                 sourceFile: e.target.files![0]
-            }));
+            };
+            setSummarySettings(newSummarySettings);
+            // Automatically apply settings to parent
+            onApplySettings(newSummarySettings, formatSettings);
         }
     };
 
     const handleRemoveFile = () => {
-        setSummarySettings(prev => ({ ...prev, sourceFile: undefined }));
+        const newSummarySettings = { ...summarySettings, sourceFile: undefined };
+        setSummarySettings(newSummarySettings);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    };
-
-    const handleApply = () => {
-        onApplySettings(summarySettings, formatSettings);
-        onClose();
+        // Automatically apply settings to parent
+        onApplySettings(newSummarySettings, formatSettings);
     };
     
     const handleGenerate = () => {
@@ -219,7 +230,7 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
                                 <label className="block text-sm font-medium text-gray-300 mb-2">Plantilla de Generación</label>
                                 <select 
                                     value={summarySettings.template}
-                                    onChange={(e) => setSummarySettings({ ...summarySettings, template: e.target.value as SummaryTemplateType })}
+                                    onChange={handleTemplateChange}
                                     className="w-full bg-slate-700 border border-slate-600 rounded-md p-2.5 text-white focus:ring-2 focus:ring-sky-500 outline-none"
                                 >
                                     {TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -324,7 +335,7 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
                             </div>
                             
                             <p className="text-xs text-gray-500 italic">
-                                Nota: Al aplicar, se actualizará visualmente el documento. Las citas existentes no se reformatearán automáticamente, solo las nuevas inserciones.
+                                Nota: Los ajustes se aplican automáticamente al documento.
                             </p>
                         </div>
                     )}
@@ -332,18 +343,13 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
 
                 <footer className="p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center flex-shrink-0 gap-3">
                     <button onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-md bg-slate-600 hover:bg-slate-500 transition-colors">
-                        Cancelar
+                        Cerrar
                     </button>
-                    <div className="flex gap-3">
-                        {activeTab === 'summary' && (
-                            <button onClick={handleGenerate} className="flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-md bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/50 transition-all">
-                                <SummarizeIcon className="w-4 h-4" /> Generar Resumen
-                            </button>
-                        )}
-                        <button onClick={handleApply} className="flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-md bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-900/50 transition-all">
-                            <CheckIcon className="w-4 h-4" /> Aplicar Ajustes
+                    {activeTab === 'summary' && (
+                        <button onClick={handleGenerate} className="flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-md bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/50 transition-all">
+                            <SummarizeIcon className="w-4 h-4" /> Generar Resumen
                         </button>
-                    </div>
+                    )}
                 </footer>
             </div>
         </div>

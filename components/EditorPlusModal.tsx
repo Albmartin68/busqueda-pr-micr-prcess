@@ -529,13 +529,6 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                 <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white">
                     <DownloadIcon className="w-5 h-5" /> Exportar PDF
                 </button>
-                <button 
-                  onClick={() => setIsSettingsModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-md bg-slate-700 hover:bg-slate-600 text-white"
-                  title="Ajustes de Formato y Resumen"
-                >
-                    <GearIcon className="w-5 h-5"/>
-                </button>
                 <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-slate-700"><XIcon className="w-5 h-5" /></button>
             </div>
           </div>
@@ -714,25 +707,53 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               )}
             </div>
           </div>
-           {/* Right Sidebar (Comments) */}
+           {/* Right Sidebar (Usage Parameters & Comments) */}
           <aside className="w-80 bg-slate-900/50 p-4 border-l border-slate-700 flex-shrink-0 flex flex-col">
-              <div className="flex-shrink-0 flex border-b border-slate-700 mb-4">
-                  <button onClick={() => setActiveSidebarTab('comments')} className="flex-1 py-2 text-sm font-semibold text-sky-400 border-b-2 border-sky-400">Comentarios ({comments.filter(c => !c.resolved).length})</button>
+              <div className="flex-shrink-0 flex items-center justify-between border-b border-slate-700 mb-4 pb-2">
+                  <span className="text-sm font-semibold text-sky-400">Parámetros de Uso</span>
+                  <button 
+                      onClick={() => setIsSettingsModalOpen(true)}
+                      className="p-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                      title="Ajustes de Formato y Resumen"
+                  >
+                      <GearIcon className="w-4 h-4"/>
+                  </button>
               </div>
+
               <div className="overflow-y-auto space-y-4 flex-grow">
-                  {comments.map(comment => (
-                      <div key={comment.id} data-comment-for={comment.targetId} onClick={() => editorRef.current?.querySelector(`#${comment.targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                          className={`p-3 rounded-md border-l-4 ${comment.resolved ? 'bg-slate-800 border-green-500' : 'bg-slate-700/50 border-amber-400'}`}>
-                          <p className="text-sm text-gray-300">{comment.text}</p>
-                          <div className="text-xs text-gray-500 mt-2 flex justify-between items-center">
-                              <span>{comment.author}</span>
-                              <button onClick={() => toggleResolveComment(comment.id)} className="hover:text-white">{comment.resolved ? 'Reabrir' : 'Resolver'}</button>
-                          </div>
+                  {/* Comments Section */}
+                  <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3 flex justify-between">
+                          Comentarios
+                          <span className="bg-slate-700 px-1.5 py-0.5 rounded text-gray-300">{comments.filter(c => !c.resolved).length}</span>
+                      </h4>
+                      <div className="space-y-3">
+                          {comments.map(comment => (
+                              <div key={comment.id} data-comment-for={comment.targetId} onClick={() => editorRef.current?.querySelector(`#${comment.targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                                  className={`p-3 rounded-md border-l-4 cursor-pointer transition-colors ${comment.resolved ? 'bg-slate-800 border-green-500 opacity-60' : 'bg-slate-700/50 border-amber-400 hover:bg-slate-700'}`}>
+                                  <p className="text-sm text-gray-300">{comment.text}</p>
+                                  <div className="text-xs text-gray-500 mt-2 flex justify-between items-center">
+                                      <span>{comment.author}</span>
+                                      <button onClick={(e) => { e.stopPropagation(); toggleResolveComment(comment.id); }} className="hover:text-white">{comment.resolved ? 'Reabrir' : 'Resolver'}</button>
+                                  </div>
+                              </div>
+                          ))}
+                          {comments.length === 0 && (
+                              <p className="text-sm text-gray-500 italic text-center py-4">No hay comentarios.</p>
+                          )}
                       </div>
-                  ))}
+                  </div>
+
                   {activeCommentTarget && (
-                      <div className="p-3 bg-slate-700 rounded-md">
-                          <textarea placeholder="Añadir comentario..." rows={3} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(e.currentTarget.value); e.currentTarget.value = ''; }}} className="w-full bg-slate-800 p-2 text-sm rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-sky-500"></textarea>
+                      <div className="p-3 bg-slate-700 rounded-md animate-fade-in">
+                          <textarea 
+                              placeholder="Escribir comentario..." 
+                              rows={3} 
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(e.currentTarget.value); e.currentTarget.value = ''; }}} 
+                              className="w-full bg-slate-800 p-2 text-sm rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-sky-500 text-white"
+                          ></textarea>
+                          <p className="text-xs text-gray-400 mt-1 text-right">Presiona Enter para enviar</p>
                       </div>
                   )}
               </div>
