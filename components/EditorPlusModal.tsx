@@ -20,6 +20,7 @@ import { ClipboardIcon } from './icons/ClipboardIcon';
 import PublishModal from './PublishModal';
 import EditorSettingsModal, { TEMPLATES } from './EditorSettingsModal'; // Imported settings modal and templates
 import { SummarySettings, FormatSettings } from '../types'; // Imported types
+import { ThesisIcon } from './icons/ThesisIcon'; // Used for the Audit icon
 
 // --- TYPE DEFINITIONS ---
 interface EditorPlusModalProps {
@@ -52,6 +53,48 @@ declare global {
     pdfjsLib: any;
   }
 }
+
+// --- STRATEGIC AUDIT PROMPT ---
+const STRATEGIC_AUDIT_PROMPT = `
+# ROL: EDITOR JEFE DE ANÁLISIS ESTRATÉGICO
+
+**Instrucción:**
+Vas a recibir un [TEXTO FUENTE] (adjunto al final de este prompt) que narra un evento histórico/corporativo. Tu trabajo NO es resumirlo. Tu trabajo es realizar una "Auditoría de Contenido" para identificar debilidades, vacíos lógicos y áreas que requieren expansión externa para convertir este texto simple en un informe de alto nivel.
+
+---
+
+## 2. TAREAS DE EVALUACIÓN
+
+Realiza el siguiente análisis crítico del texto proporcionado:
+
+**A. Detección de "Cajas Negras" (Vacíos de Causalidad)**
+Identifica momentos en la narrativa donde ocurre un hecho importante sin una explicación de la causa real (el "cómo" o el "por qué").
+* *Ejemplo:* Si el texto dice "Las tropas se rindieron", tu análisis debe preguntar: "¿Por qué se rindieron? ¿Hubo dinero, amenaza o bloqueo?"
+
+**B. Identificación de Actores Ausentes**
+Basado en la lógica del evento, ¿qué tipo de actores faltan? (Ej. Actores económicos, corporaciones, potencias extranjeras, líderes de base). Señala qué nombres específicos o roles parecen haber sido omitidos en esta versión de la historia.
+
+**C. Evaluación del Tono y Sesgo**
+Determina si el texto es meramente descriptivo/celebratorio (historia oficial) o analítico. Clasifica el nivel de profundidad actual del 1 al 10.
+
+---
+
+## 3. OUTPUT: ESTRATEGIA DE POTENCIACIÓN (Plan de Expansión)
+
+Genera una lista estructurada de instrucciones para potenciar este informe. Esta salida servirá de guía para el siguiente paso (el Meta-Prompt de búsqueda).
+
+La estructura de salida debe ser:
+
+1.  **Diagnóstico del Informe Original:** (Breve crítica de 3 líneas sobre la calidad del texto fuente).
+2.  **Puntos Ciegos Detectados:** (Lista de 3 a 5 preguntas clave que el texto NO responde y que son vitales para entender el hecho completo).
+3.  **Vectores de Expansión Requeridos:** Define qué temas específicos se deben investigar externamente para "arreglar" el informe.
+    * *Ejemplo:* "Se requiere investigar el rol del Ferrocarril y la Marina de EE.UU. para explicar la rendición en Colón".
+
+---
+
+**OBJETIVO FINAL:**
+Entregar un mapa claro de qué le falta al texto original para que la IA sepa exactamente qué buscar en el siguiente paso.
+`;
 
 // --- HELPER & UTILITY COMPONENTS ---
 const ToolbarButton: React.FC<{ onMouseDown: (e: React.MouseEvent) => void; children: React.ReactNode; title: string, active?: boolean }> = ({ onMouseDown, children, title, active }) => (
@@ -98,6 +141,11 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   const [isCitationModalOpen, setIsCitationModalOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // New state for Settings Modal
+
+  // Strategic Audit State
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditResult, setAuditResult] = useState<string>('');
+  const [showAuditModal, setShowAuditModal] = useState(false);
 
   // Summary State
   const [summaryContent, setSummaryContent] = useState<string>('');
@@ -208,6 +256,37 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     } finally {
         setIsGeneratingSummary(false);
     }
+  };
+
+  const handleRunStrategicAudit = async () => {
+      // Prioritize source file from summary settings
+      if (!summarySettings.sourceFile) {
+          showToast("Se requiere un documento base. Cárguelo en Ajustes > Resumen.", 4000, <XIcon className="w-5 h-5 text-amber-400"/>);
+          return;
+      }
+
+      setIsAuditing(true);
+      showToast("Leyendo documento base...", 0);
+
+      try {
+          const content = await readFileContent(summarySettings.sourceFile);
+
+          if (!content || content.length < 50) {
+              throw new Error("Contenido insuficiente en el documento base.");
+          }
+
+          showToast("Ejecutando Auditoría Estratégica...", 0);
+          const result = await generateCustomSummary(content, STRATEGIC_AUDIT_PROMPT);
+          setAuditResult(result);
+          setShowAuditModal(true);
+          showToast("Auditoría completada.", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+      } catch (e) {
+          console.error("Audit failed", e);
+          const msg = e instanceof Error ? e.message : "Error desconocido";
+          showToast(`Error: ${msg}`, 3000, <XIcon className="w-5 h-5 text-red-400"/>);
+      } finally {
+          setIsAuditing(false);
+      }
   };
 
   const readFileContent = async (file: File): Promise<string> => {
@@ -547,15 +626,33 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               ))}
             </div>
             {activeSidebarTab === 'índice' && (
-              <ul className="text-sm text-gray-400 space-y-2 overflow-y-auto">
-                {headings.length > 0 ? headings.map(h => (
-                  <li key={h.id} className="cursor-pointer hover:text-white truncate" onClick={() => editorRef.current?.querySelector(`#${h.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={h.text}>
-                    {h.tagName === 'h1' && <span className="font-semibold">{h.text}</span>}
-                    {h.tagName === 'h2' && <span className="pl-3">{h.text}</span>}
-                    {h.tagName === 'h3' && <span className="pl-6 text-gray-500">{h.text}</span>}
-                  </li>
-                )) : <li className="text-gray-500 italic">No hay encabezados.</li>}
-              </ul>
+              <div className="flex flex-col h-full">
+                <ul className="text-sm text-gray-400 space-y-2 overflow-y-auto flex-grow">
+                  {headings.length > 0 ? headings.map(h => (
+                    <li key={h.id} className="cursor-pointer hover:text-white truncate" onClick={() => editorRef.current?.querySelector(`#${h.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={h.text}>
+                      {h.tagName === 'h1' && <span className="font-semibold">{h.text}</span>}
+                      {h.tagName === 'h2' && <span className="pl-3">{h.text}</span>}
+                      {h.tagName === 'h3' && <span className="pl-6 text-gray-500">{h.text}</span>}
+                    </li>
+                  )) : <li className="text-gray-500 italic">No hay encabezados.</li>}
+                </ul>
+                
+                {/* STRATEGIC AUDIT TOOL */}
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                    <h4 className="text-xs font-semibold text-sky-400 uppercase mb-2">Herramientas de Análisis</h4>
+                    <button 
+                        onClick={handleRunStrategicAudit}
+                        disabled={isAuditing}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-gray-200 rounded-md transition-colors disabled:opacity-50"
+                    >
+                        {isAuditing ? <SpinnerIcon className="w-4 h-4" /> : <ThesisIcon className="w-4 h-4 text-amber-400" />}
+                        {isAuditing ? 'Auditando...' : 'Auditoría Estratégica'}
+                    </button>
+                    <p className="text-[10px] text-gray-500 mt-2 text-center">
+                        Analiza debilidades y vacíos lógicos en el documento base (Ajustes {'>'} Resumen).
+                    </p>
+                </div>
+              </div>
             )}
             {activeSidebarTab === 'activos' && (
               <div className="flex flex-col h-full">
@@ -775,6 +872,36 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                 setIsPublishModalOpen(false);
             }}
         />
+      )}
+
+      {/* STRATEGIC AUDIT MODAL */}
+      {showAuditModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70]" onClick={() => setShowAuditModal(false)}>
+              <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-xl w-full max-w-3xl m-4 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <header className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                          <ThesisIcon className="w-5 h-5 text-amber-400"/>
+                          Resultado de Auditoría Estratégica
+                      </h2>
+                      <button onClick={() => setShowAuditModal(false)} className="text-gray-400 hover:text-white"><XIcon className="w-6 h-6"/></button>
+                  </header>
+                  <div className="p-6 overflow-y-auto bg-slate-800/50 flex-grow">
+                      <div className="prose prose-invert prose-sm max-w-none">
+                          <div dangerouslySetInnerHTML={{ __html: auditResult.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/# (.*)/g, '<h1 class="text-xl font-bold my-2">$1</h1>').replace(/## (.*)/g, '<h2 class="text-lg font-bold my-2">$1</h2>') }} />
+                      </div>
+                  </div>
+                  <footer className="p-4 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
+                      <button onClick={() => { navigator.clipboard.writeText(auditResult); showToast("Copiado al portapapeles", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>); }} 
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white flex items-center gap-2">
+                          <ClipboardIcon className="w-4 h-4"/> Copiar
+                      </button>
+                      <button onClick={() => { insertHtmlInEditor(`<hr/><h3>Reporte de Auditoría Estratégica</h3><pre style="background:#1e293b;padding:10px;border-radius:4px;white-space:pre-wrap;">${auditResult}</pre><p><br/></p>`); setShowAuditModal(false); }}
+                          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded text-sm text-white">
+                          Insertar al Final
+                      </button>
+                  </footer>
+              </div>
+          </div>
       )}
     </div>
   );
