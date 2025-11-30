@@ -9,6 +9,8 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { FilePlusIcon } from './icons/FilePlusIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { GearIcon } from './icons/GearIcon'; // Imported GearIcon
+import { EyeIcon } from './icons/EyeIcon'; // Imported EyeIcon
+import { ChevronDownIcon } from './icons/ChevronDownIcon'; // Imported ChevronDownIcon
 import { assetService } from '../services/editorPlus/assetService';
 import { renderService } from '../services/editorPlus/renderService';
 import { docService } from '../services/editorPlus/docService';
@@ -21,6 +23,7 @@ import PublishModal from './PublishModal';
 import EditorSettingsModal, { TEMPLATES } from './EditorSettingsModal'; // Imported settings modal and templates
 import { SummarySettings, FormatSettings } from '../types'; // Imported types
 import { ThesisIcon } from './icons/ThesisIcon'; // Used for the Audit icon
+import { DocIcon } from './icons/FileIcons';
 
 // --- TYPE DEFINITIONS ---
 interface EditorPlusModalProps {
@@ -44,6 +47,18 @@ export interface Asset {
   name: string;
   file: File;
 }
+export interface AuditReport {
+    id: string;
+    timestamp: string;
+    content: string;
+}
+export interface SummaryReport {
+    id: string;
+    timestamp: string;
+    content: string;
+    type: string;
+}
+
 export type CitationStyle = 'APA' | 'MLA' | 'Chicago';
 type SyncStatus = 'synced' | 'saving' | 'edited' | 'offline';
 
@@ -146,10 +161,12 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<string>('');
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditReports, setAuditReports] = useState<AuditReport[]>([]); // Store generated audits
 
   // Summary State
   const [summaryContent, setSummaryContent] = useState<string>('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryReports, setSummaryReports] = useState<SummaryReport[]>([]); // Store generated summaries
 
   // Cloud-connected state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
@@ -166,6 +183,15 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       lineHeight: '2.0',
       margins: '2.54cm',
       citationStyle: '(Autor, Año)'
+  });
+  
+  // Sidebar Folders State
+  const [openFolders, setOpenFolders] = useState({
+      baseDoc: true,
+      audits: true,
+      summaries: true,
+      assets: false,
+      comments: true
   });
 
 
@@ -246,6 +272,16 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         // 4. Call Service
         const summary = await generateCustomSummary(text, prompt);
         setSummaryContent(summary);
+        
+        // Save to usage history
+        const newReport: SummaryReport = {
+            id: `sum-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            content: summary,
+            type: settings.template === 'personalized' ? 'Personalizado' : TEMPLATES.find(t => t.id === settings.template)?.label || 'Resumen'
+        };
+        setSummaryReports(prev => [newReport, ...prev]);
+
         showToast("Resumen generado exitosamente.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
 
     } catch (e) {
@@ -279,7 +315,16 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
           const result = await generateCustomSummary(content, STRATEGIC_AUDIT_PROMPT);
           setAuditResult(result);
           setShowAuditModal(true);
-          showToast("Auditoría completada.", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+          
+          // Add to reports sidebar
+          const newReport: AuditReport = {
+              id: `audit-${Date.now()}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              content: result
+          };
+          setAuditReports(prev => [newReport, ...prev]);
+
+          showToast("Auditoría completada y guardada.", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
       } catch (e) {
           console.error("Audit failed", e);
           const msg = e instanceof Error ? e.message : "Error desconocido";
@@ -287,6 +332,22 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       } finally {
           setIsAuditing(false);
       }
+  };
+
+  const downloadReport = (content: string, prefix: string) => {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${prefix}_${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  };
+
+  const toggleFolder = (folder: keyof typeof openFolders) => {
+      setOpenFolders(prev => ({ ...prev, [folder]: !prev[folder] }));
   };
 
   const readFileContent = async (file: File): Promise<string> => {
@@ -510,6 +571,8 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         range.surroundContents(span);
         setActiveSidebarTab('comments');
         setActiveCommentTarget(commentId);
+        // Force comments folder open
+        setOpenFolders(prev => ({ ...prev, comments: true }));
       } catch (e) {
         console.error("Could not wrap selection:", e);
         alert("No se pudo agregar un comentario a esta selección. Intente seleccionar texto dentro de un solo bloque.");
@@ -545,7 +608,8 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       const targetId = target.getAttribute('href')!.substring(1);
       editorRef.current?.querySelector(`#${targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (target.classList.contains('comment-highlight')) {
-        setActiveSidebarTab('comments');
+        // Force comments folder open
+        setOpenFolders(prev => ({ ...prev, comments: true }));
         setTimeout(() => {
             document.querySelector(`[data-comment-for="${target.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
@@ -805,10 +869,10 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               )}
             </div>
           </div>
-           {/* Right Sidebar (Usage Parameters & Comments) */}
+           {/* Right Sidebar (Usage Folder & Comments) */}
           <aside className="w-80 bg-slate-900/50 p-4 border-l border-slate-700 flex-shrink-0 flex flex-col">
               <div className="flex-shrink-0 flex items-center justify-between border-b border-slate-700 mb-4 pb-2">
-                  <span className="text-sm font-semibold text-sky-400">Parámetros de Uso</span>
+                  <span className="text-sm font-semibold text-sky-400">Carpeta de Uso</span>
                   <button 
                       onClick={() => setIsSettingsModalOpen(true)}
                       className="p-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-white transition-colors"
@@ -818,42 +882,138 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                   </button>
               </div>
 
-              <div className="overflow-y-auto space-y-4 flex-grow">
-                  {/* Comments Section */}
-                  <div className="mb-4">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3 flex justify-between">
-                          Comentarios
-                          <span className="bg-slate-700 px-1.5 py-0.5 rounded text-gray-300">{comments.filter(c => !c.resolved).length}</span>
-                      </h4>
-                      <div className="space-y-3">
-                          {comments.map(comment => (
+              <div className="overflow-y-auto flex-grow space-y-1">
+                  
+                  {/* FOLDER 1: DOCUMENTO BASE */}
+                  <div className="border-b border-slate-700">
+                    <button onClick={() => toggleFolder('baseDoc')} className="w-full flex items-center justify-between p-2 text-xs font-semibold uppercase text-gray-400 hover:bg-slate-800 hover:text-sky-400 transition-colors">
+                        <div className="flex items-center gap-2"><DocIcon className="w-4 h-4"/> Documento Base</div>
+                        <div className={`transition-transform duration-200 ${openFolders.baseDoc ? 'rotate-180' : ''}`}><ChevronDownIcon className="w-4 h-4"/></div>
+                    </button>
+                    {openFolders.baseDoc && (
+                        <div className="p-2 bg-slate-900/30">
+                            {summarySettings.sourceFile ? (
+                                <div className="flex items-center gap-2 text-sm text-sky-300 bg-slate-800 p-2 rounded border border-slate-700">
+                                    <DocIcon className="w-4 h-4 flex-shrink-0"/>
+                                    <div className="min-w-0">
+                                        <p className="truncate font-medium">{summarySettings.sourceFile.name}</p>
+                                        <p className="text-[10px] text-gray-500">{(summarySettings.sourceFile.size / 1024).toFixed(1)} KB</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500 italic p-1">No hay documento seleccionado.</p>
+                            )}
+                        </div>
+                    )}
+                  </div>
+
+                  {/* FOLDER 2: AUDITORÍAS ESTRATÉGICAS */}
+                  <div className="border-b border-slate-700">
+                    <button onClick={() => toggleFolder('audits')} className="w-full flex items-center justify-between p-2 text-xs font-semibold uppercase text-gray-400 hover:bg-slate-800 hover:text-amber-400 transition-colors">
+                        <div className="flex items-center gap-2"><ThesisIcon className="w-4 h-4"/> Auditorías <span className="bg-slate-700 text-gray-300 px-1.5 py-0.5 rounded text-[10px]">{auditReports.length}</span></div>
+                        <div className={`transition-transform duration-200 ${openFolders.audits ? 'rotate-180' : ''}`}><ChevronDownIcon className="w-4 h-4"/></div>
+                    </button>
+                    {openFolders.audits && (
+                        <div className="p-2 bg-slate-900/30 space-y-2">
+                             {auditReports.length > 0 ? auditReports.map(report => (
+                                  <div key={report.id} className="bg-slate-800 p-2 rounded border border-slate-700 flex justify-between items-center group">
+                                      <div className="min-w-0">
+                                          <p className="text-xs text-gray-300 font-medium truncate">Auditoría {report.timestamp}</p>
+                                      </div>
+                                      <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                          <button onClick={() => downloadReport(report.content, 'Auditoria')} title="Descargar" className="p-1 hover:bg-slate-600 rounded text-sky-400"><DownloadIcon className="w-3 h-3"/></button>
+                                          <button onClick={() => { setAuditResult(report.content); setShowAuditModal(true); }} title="Ver" className="p-1 hover:bg-slate-600 rounded text-gray-400"><EyeIcon className="w-3 h-3"/></button>
+                                      </div>
+                                  </div>
+                              )) : <p className="text-xs text-gray-500 italic p-1">Sin auditorías generadas.</p>}
+                        </div>
+                    )}
+                  </div>
+
+                  {/* FOLDER 3: RESÚMENES */}
+                  <div className="border-b border-slate-700">
+                    <button onClick={() => toggleFolder('summaries')} className="w-full flex items-center justify-between p-2 text-xs font-semibold uppercase text-gray-400 hover:bg-slate-800 hover:text-purple-400 transition-colors">
+                        <div className="flex items-center gap-2"><BookOpenIcon className="w-4 h-4"/> Resúmenes <span className="bg-slate-700 text-gray-300 px-1.5 py-0.5 rounded text-[10px]">{summaryReports.length}</span></div>
+                        <div className={`transition-transform duration-200 ${openFolders.summaries ? 'rotate-180' : ''}`}><ChevronDownIcon className="w-4 h-4"/></div>
+                    </button>
+                    {openFolders.summaries && (
+                        <div className="p-2 bg-slate-900/30 space-y-2">
+                             {summaryReports.length > 0 ? summaryReports.map(report => (
+                                  <div key={report.id} className="bg-slate-800 p-2 rounded border border-slate-700 flex flex-col gap-2 group">
+                                      <div className="flex justify-between items-start">
+                                          <div className="min-w-0">
+                                              <p className="text-xs text-gray-300 font-bold truncate">{report.type}</p>
+                                              <p className="text-[10px] text-gray-500">{report.timestamp}</p>
+                                          </div>
+                                          <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                              <button onClick={() => downloadReport(report.content, 'Resumen')} title="Descargar" className="p-1 hover:bg-slate-600 rounded text-sky-400"><DownloadIcon className="w-3 h-3"/></button>
+                                              <button onClick={() => { setSummaryContent(report.content); setActiveSidebarTab('resumen'); }} title="Ver en Pestaña" className="p-1 hover:bg-slate-600 rounded text-gray-400"><EyeIcon className="w-3 h-3"/></button>
+                                          </div>
+                                      </div>
+                                  </div>
+                              )) : <p className="text-xs text-gray-500 italic p-1">Sin resúmenes generados.</p>}
+                        </div>
+                    )}
+                  </div>
+                  
+                  {/* FOLDER 4: ACTIVOS */}
+                  <div className="border-b border-slate-700">
+                    <button onClick={() => toggleFolder('assets')} className="w-full flex items-center justify-between p-2 text-xs font-semibold uppercase text-gray-400 hover:bg-slate-800 hover:text-green-400 transition-colors">
+                        <div className="flex items-center gap-2"><FilePlusIcon className="w-4 h-4"/> Activos <span className="bg-slate-700 text-gray-300 px-1.5 py-0.5 rounded text-[10px]">{assets.length}</span></div>
+                        <div className={`transition-transform duration-200 ${openFolders.assets ? 'rotate-180' : ''}`}><ChevronDownIcon className="w-4 h-4"/></div>
+                    </button>
+                    {openFolders.assets && (
+                        <div className="p-2 bg-slate-900/30">
+                            {assets.length > 0 ? (
+                                <ul className="space-y-1">
+                                    {assets.map(asset => (
+                                        <li key={asset.id} className="flex items-center gap-2 text-xs text-gray-300 hover:text-white group">
+                                            <img src={asset.src} alt="" className="w-5 h-5 rounded object-cover border border-slate-600"/>
+                                            <span className="truncate flex-1">{asset.name}</span>
+                                            <button onClick={() => {insertHtmlInEditor(assetService.createFigureHtml(asset.src, asset.name)); updateEditorState();}} className="text-gray-500 hover:text-green-400 opacity-0 group-hover:opacity-100">+</button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="text-xs text-gray-500 italic p-1">Sin activos.</p>}
+                        </div>
+                    )}
+                  </div>
+
+                  {/* FOLDER 5: COMENTARIOS */}
+                  <div className="border-b border-slate-700">
+                    <button onClick={() => toggleFolder('comments')} className="w-full flex items-center justify-between p-2 text-xs font-semibold uppercase text-gray-400 hover:bg-slate-800 hover:text-blue-400 transition-colors">
+                        <div className="flex items-center gap-2"><MessageSquareIcon className="w-4 h-4"/> Comentarios <span className="bg-slate-700 text-gray-300 px-1.5 py-0.5 rounded text-[10px]">{comments.filter(c => !c.resolved).length}</span></div>
+                        <div className={`transition-transform duration-200 ${openFolders.comments ? 'rotate-180' : ''}`}><ChevronDownIcon className="w-4 h-4"/></div>
+                    </button>
+                    {openFolders.comments && (
+                        <div className="p-2 bg-slate-900/30 space-y-3">
+                            {comments.map(comment => (
                               <div key={comment.id} data-comment-for={comment.targetId} onClick={() => editorRef.current?.querySelector(`#${comment.targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                                  className={`p-3 rounded-md border-l-4 cursor-pointer transition-colors ${comment.resolved ? 'bg-slate-800 border-green-500 opacity-60' : 'bg-slate-700/50 border-amber-400 hover:bg-slate-700'}`}>
-                                  <p className="text-sm text-gray-300">{comment.text}</p>
-                                  <div className="text-xs text-gray-500 mt-2 flex justify-between items-center">
+                                  className={`p-2 rounded-md border-l-4 cursor-pointer transition-colors ${comment.resolved ? 'bg-slate-800 border-green-500 opacity-60' : 'bg-slate-800 border-amber-400 hover:bg-slate-700'}`}>
+                                  <p className="text-xs text-gray-300 line-clamp-2">{comment.text}</p>
+                                  <div className="text-[10px] text-gray-500 mt-1 flex justify-between items-center">
                                       <span>{comment.author}</span>
                                       <button onClick={(e) => { e.stopPropagation(); toggleResolveComment(comment.id); }} className="hover:text-white">{comment.resolved ? 'Reabrir' : 'Resolver'}</button>
                                   </div>
                               </div>
-                          ))}
-                          {comments.length === 0 && (
-                              <p className="text-sm text-gray-500 italic text-center py-4">No hay comentarios.</p>
-                          )}
-                      </div>
+                            ))}
+                            {comments.length === 0 && <p className="text-xs text-gray-500 italic p-1">No hay comentarios.</p>}
+                            
+                            {activeCommentTarget && (
+                                <div className="p-2 bg-slate-700 rounded-md animate-fade-in mt-2">
+                                    <textarea 
+                                        placeholder="Escribir comentario..." 
+                                        rows={3} 
+                                        autoFocus
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(e.currentTarget.value); e.currentTarget.value = ''; }}} 
+                                        className="w-full bg-slate-800 p-2 text-xs rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-sky-500 text-white"
+                                    ></textarea>
+                                    <p className="text-[10px] text-gray-400 mt-1 text-right">Enter para enviar</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                   </div>
-
-                  {activeCommentTarget && (
-                      <div className="p-3 bg-slate-700 rounded-md animate-fade-in">
-                          <textarea 
-                              placeholder="Escribir comentario..." 
-                              rows={3} 
-                              autoFocus
-                              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(e.currentTarget.value); e.currentTarget.value = ''; }}} 
-                              className="w-full bg-slate-800 p-2 text-sm rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-sky-500 text-white"
-                          ></textarea>
-                          <p className="text-xs text-gray-400 mt-1 text-right">Presiona Enter para enviar</p>
-                      </div>
-                  )}
               </div>
           </aside>
         </main>
