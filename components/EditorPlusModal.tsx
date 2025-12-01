@@ -224,6 +224,36 @@ const Toast: React.FC<{ message: string; show: boolean; icon?: React.ReactNode }
   );
 };
 
+// --- MARKDOWN PARSER ---
+const parseMarkdown = (text: string) => {
+    if (!text) return '';
+    // If text looks like the HTML error card, return as is.
+    if (text.trim().startsWith('<div')) return text;
+
+    let md = text
+        // Safety: Basic escaping should happen if we were handling user input strictly,
+        // but here we trust the AI/System output.
+        
+        // Headers
+        .replace(/^### (.*$)/gm, '<h3 class="text-lg font-bold mt-4 mb-2 text-sky-300">$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-6 mb-3 text-sky-400 border-b border-slate-700 pb-1">$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-6 mb-4 text-white">$1</h1>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-sky-100">$1</strong>')
+        // Italic
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Lists
+        .replace(/^\s*[\-\*] (.*$)/gm, '<li class="ml-6 list-disc mb-1 text-gray-300">$1</li>')
+        // Blockquotes
+        .replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-amber-500 pl-4 py-1 my-2 text-gray-400 italic bg-slate-800/50 rounded-r">$1</blockquote>')
+        // Horizontal Rules
+        .replace(/^---$/gm, '<hr class="my-6 border-slate-600" />')
+        // Line breaks (handle properly to avoid breaking HTML structure if mixed)
+        .replace(/\n/g, '<br />');
+
+    return md;
+};
+
 // --- MAIN COMPONENT ---
 const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -353,7 +383,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')) {
           try {
               if (!window.JSZip) {
-                  throw new Error("La librería JSZip no está disponible.");
+                  throw new Error("La librería JSZip no está disponible. Recargue la página.");
               }
               const arrayBuffer = await file.arrayBuffer();
               const zip = await new window.JSZip().loadAsync(arrayBuffer);
@@ -363,16 +393,33 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                    throw new Error("No se encontró contenido válido en el archivo Word.");
               }
               
-              // Simple Regex to extract text from XML tags to avoid DOMParser overhead/issues
-              const parser = new DOMParser();
-              const xmlDoc = parser.parseFromString(docXml, "text/xml");
-              const paragraphs = xmlDoc.getElementsByTagName("w:p");
+              // Robust Regex extraction for text content that respects paragraphs
               let fullText = "";
               
-              for (let i = 0; i < paragraphs.length; i++) {
-                  fullText += paragraphs[i].textContent + "\n";
+              // Use regex to find paragraphs <w:p>
+              const paragraphMatches = docXml.match(/<w:p[\s\S]*?<\/w:p>/g);
+              
+              if (paragraphMatches) {
+                  fullText = paragraphMatches.map(p => {
+                      // Inside each paragraph, find text runs <w:t>
+                      const textMatches = p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+                      if (textMatches) {
+                          return textMatches.map(t => {
+                              // Extract content inside <w:t>...</w:t>
+                              return t.replace(/<[^>]*>/g, '');
+                          }).join('');
+                      }
+                      return "";
+                  }).filter(text => text.length > 0).join('\n\n');
+              } else {
+                  // Fallback: simple tag stripping if paragraph detection fails (unlikely)
+                  fullText = docXml.replace(/<[^>]+>/g, ' ');
               }
               
+              if (!fullText.trim()) {
+                   throw new Error("El archivo Word parece estar vacío o no contiene texto legible.");
+              }
+
               return { type: 'text', content: fullText };
           } catch (e) {
               console.error("DOCX extraction error:", e);
@@ -396,7 +443,11 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       // 4. Standard Text Reading (Fallback)
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = (e) => resolve({ type: 'text', content: e.target?.result as string });
+          reader.onload = (e) => {
+              const text = e.target?.result as string;
+              if (!text) resolve({ type: 'text', content: "" }); // Safe empty return
+              resolve({ type: 'text', content: text });
+          };
           reader.onerror = (e) => reject(new Error("Error al leer el archivo de texto."));
           reader.readAsText(file);
       });
@@ -414,7 +465,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         if (result.type === 'image') {
             setPreviewImage({ src: `data:${result.mimeType};base64,${result.content}`, mimeType: result.mimeType || '' });
         } else {
-            setPreviewContent(result.content);
+            setPreviewContent(result.content || "El documento no tiene contenido de texto visible.");
         }
         setIsPreviewModalOpen(true);
     } catch (e) {
@@ -439,9 +490,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         const sourceData = await readSourceFile(settings.sourceFile);
         
         // Validation for empty text (only if not an image)
-        // Lowered threshold to 20 chars to allow very short notes
-        if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
-             throw new Error("El documento parece estar vacío o no se pudo extraer texto legible.");
+        // Lowered threshold to 5 chars to allow very short notes
+        if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 5)) {
+             throw new Error("El documento parece estar vacío (menos de 5 caracteres detectados) o es un archivo escaneado sin texto seleccionable.");
         }
 
         showToast("Sintetizando análisis multimodal...", 0);
@@ -534,6 +585,32 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         </div>
     </div>
   `;
+  
+  // Helper to inject Settings and Format into prompts
+  const applySettingsToPrompt = (basePrompt: string) => {
+      let contextualPrompt = basePrompt;
+
+      // Inject Custom Settings (Tone, Audience, Focus)
+      if (summarySettings.template === 'personalized' && summarySettings.customConfig) {
+          contextualPrompt += `\n\n### RESTRICCIONES DE PERSONALIZACIÓN DEL USUARIO (Prioridad Alta)\n`;
+          if (summarySettings.customConfig.tone) contextualPrompt += `- ADAPTACIÓN DE TONO: ${summarySettings.customConfig.tone}\n`;
+          if (summarySettings.customConfig.audience) contextualPrompt += `- AUDIENCIA OBJETIVO: ${summarySettings.customConfig.audience}\n`;
+          if (summarySettings.customConfig.focus) contextualPrompt += `- ENFOQUE PRIORITARIO: ${summarySettings.customConfig.focus}\n`;
+      } else {
+          // If not personalized, inject Template Context
+          const templateName = TEMPLATES.find(t => t.id === summarySettings.template)?.label;
+          if (templateName) {
+              contextualPrompt += `\n\n### CONTEXTO DE ESTILO\nEl usuario está trabajando bajo un formato de estilo "${templateName}". Intenta, en la medida de lo posible, alinear el tono del análisis a este contexto profesional.\n`;
+          }
+      }
+
+      // Inject Format Settings
+      contextualPrompt += `\n### REGLAS DE FORMATO Y ESTILO\n`;
+      contextualPrompt += `- Si es necesario citar o referenciar, utiliza el estándar: ${formatSettings.standard} (${formatSettings.citationStyle}).\n`;
+      contextualPrompt += `- Mantén una estructura limpia y profesional en Markdown.\n`;
+
+      return contextualPrompt;
+  };
 
   const handleRunStrategicAudit = async () => {
       setAnalysisModalConfig({ title: 'Resultado de Auditoría Estratégica', icon: <ThesisIcon className="w-5 h-5 text-amber-400"/> });
@@ -550,18 +627,21 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       try {
           const sourceData = await readSourceFile(summarySettings.sourceFile);
 
-          if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
-              throw new Error("El documento base parece estar vacío o no contiene texto legible.");
+          if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 5)) {
+              throw new Error("El documento parece estar vacío (menos de 5 caracteres detectados) o es un archivo escaneado sin texto seleccionable.");
           }
 
-          showToast("Analizando documento base...", 0);
+          showToast("Analizando documento base con ajustes personalizados...", 0);
           
+          // Inject user settings into the prompt
+          const finalAuditPrompt = applySettingsToPrompt(STRATEGIC_AUDIT_PROMPT);
+
           let result;
           if (sourceData.type === 'image') {
-              const imagePrompt = STRATEGIC_AUDIT_PROMPT + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Analiza visualmente todo el texto contenido y trátalo como el [DOCUMENTO BASE]. Ignora artefactos irrelevantes.\n`;
+              const imagePrompt = finalAuditPrompt + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Analiza visualmente todo el texto contenido y trátalo como el [DOCUMENTO BASE]. Ignora artefactos irrelevantes.\n`;
               result = await generateCustomSummary('', imagePrompt, { data: sourceData.content, mimeType: sourceData.mimeType! });
           } else {
-              result = await generateCustomSummary(sourceData.content, STRATEGIC_AUDIT_PROMPT);
+              result = await generateCustomSummary(sourceData.content, finalAuditPrompt);
           }
           
           if (!result) throw new Error("La IA no devolvió resultados.");
@@ -604,19 +684,22 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       
       try {
           const sourceData = await readSourceFile(summarySettings.sourceFile);
-           if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
-              throw new Error("El documento base parece estar vacío o no contiene texto legible.");
+           if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 5)) {
+              throw new Error("El documento parece estar vacío (menos de 5 caracteres detectados) o es un archivo escaneado sin texto seleccionable.");
           }
           
-          showToast("Ejecutando diagnóstico y búsqueda...", 0);
+          showToast("Ejecutando diagnóstico y búsqueda con parámetros definidos...", 0);
+
+          // Inject user settings into the prompt
+          const finalSaepPrompt = applySettingsToPrompt(SAEP_PROMPT);
 
           let result;
           // Use search enabled for SAEP (4th argument = true)
           if (sourceData.type === 'image') {
-               const imagePrompt = SAEP_PROMPT + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Extrae todo el texto visual y úsalo como [TEXTO BASE].\n`;
+               const imagePrompt = finalSaepPrompt + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Extrae todo el texto visual y úsalo como [TEXTO BASE].\n`;
                result = await generateCustomSummary('', imagePrompt, { data: sourceData.content, mimeType: sourceData.mimeType! }, true);
           } else {
-               result = await generateCustomSummary(sourceData.content, SAEP_PROMPT, undefined, true);
+               result = await generateCustomSummary(sourceData.content, finalSaepPrompt, undefined, true);
           }
 
           if (!result) throw new Error("La IA no devolvió resultados.");
@@ -1021,7 +1104,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
            {/* Right Sidebar */}
           <aside className="w-80 bg-slate-900/50 p-4 border-l border-slate-700 flex-shrink-0 flex flex-col">
               <div className="flex-shrink-0 flex items-center justify-between border-b border-slate-700 mb-4 pb-2">
-                  <span className="text-sm font-semibold text-sky-400">Carpeta de Uso</span>
+                  <span className="text-sm font-semibold text-sky-400">Subir Archivo y Ajuste de Formato</span>
                   <button onClick={() => setIsSettingsModalOpen(true)} className="p-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-white"><GearIcon className="w-4 h-4"/></button>
               </div>
 
@@ -1171,13 +1254,13 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                   </header>
                   <div className="p-6 overflow-y-auto bg-slate-800/50 flex-grow">
                       <div className="prose prose-invert prose-sm max-w-none text-gray-300">
-                          {/* Safe rendering of HTML content including the Error Card */}
-                          <div dangerouslySetInnerHTML={{ __html: auditResult.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/^# (.*)/gm, '<h1 class="text-xl font-bold my-4 text-white">$1</h1>').replace(/^## (.*)/gm, '<h2 class="text-lg font-bold my-3 text-sky-400">$1</h2>').replace(/^\* (.*)/gm, '<li class="ml-4">$1</li>') }} />
+                           {/* Using parsed HTML for safe rendering of both Error Cards and AI Markdown */}
+                           <div dangerouslySetInnerHTML={{ __html: parseMarkdown(auditResult) }} />
                       </div>
                   </div>
                   <footer className="p-4 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
                       <button onClick={() => { navigator.clipboard.writeText(auditResult); showToast("Copiado al portapapeles", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>); }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white flex items-center gap-2"><ClipboardIcon className="w-4 h-4"/> Copiar</button>
-                      <button onClick={() => { insertHtmlInEditor(`<hr/><h3>Reporte de Análisis</h3><pre style="background:#1e293b;padding:10px;border-radius:4px;white-space:pre-wrap;">${auditResult}</pre><p><br/></p>`); setShowAuditModal(false); }} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded text-sm text-white">Insertar al Final</button>
+                      <button onClick={() => { insertHtmlInEditor(`<hr/><h3>Reporte de Análisis</h3><div style="background:#1e293b;padding:10px;border-radius:4px;">${parseMarkdown(auditResult)}</div><p><br/></p>`); setShowAuditModal(false); }} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded text-sm text-white">Insertar al Final</button>
                   </footer>
               </div>
           </div>
