@@ -189,7 +189,7 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
                                         type="file" 
                                         ref={fileInputRef}
                                         onChange={handleFileChange}
-                                        accept=".pdf,.docx,.txt"
+                                        accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
                                         className="hidden"
                                     />
                                     {!summarySettings.sourceFile ? (
@@ -200,7 +200,7 @@ const EditorSettingsModal: React.FC<EditorSettingsModalProps> = ({ onClose, curr
                                             <UploadCloudIcon className="w-8 h-8 text-slate-500 group-hover:text-sky-400 transition-colors" />
                                             <div className="text-center">
                                                 <span className="block font-medium">Haga clic para subir documento</span>
-                                                <span className="text-xs text-gray-500">Soporta PDF, DOCX, TXT</span>
+                                                <span className="text-xs text-gray-500">PDF, DOCX, TXT e Imágenes (OCR)</span>
                                             </div>
                                         </button>
                                     ) : (

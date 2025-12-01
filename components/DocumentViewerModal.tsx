@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DocumentResult, FlashcardItem } from '../types';
-import { translateDocumentContent, summarizeContent } from '../services/geminiService';
+import { translateDocumentContent, summarizeContent, extractTextFromImage } from '../services/geminiService';
 import { ARGOS_LANGUAGES } from '../constants';
 
 import { SpinnerIcon } from './icons/SpinnerIcon';
@@ -13,6 +14,7 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { XIcon } from './icons/XIcon';
 import { SummarizeIcon } from './icons/SummarizeIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
+import { EyeIcon } from './icons/EyeIcon';
 
 interface DocumentViewerModalProps {
   document: DocumentResult;
@@ -35,6 +37,10 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(ARGOS_LANGUAGES[0].value);
 
+  // OCR State
+  const [ocrContent, setOcrContent] = useState<string | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
+
   // Internal search state
   const [internalSearchQuery, setInternalSearchQuery] = useState(initialSearchQuery);
   const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
@@ -50,9 +56,9 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   const [isSelectionCopied, setIsSelectionCopied] = useState<boolean>(false);
 
   const contentToDisplay = useMemo(() => {
-    const baseContent = viewMode === 'summary' ? summary : document.content;
+    const baseContent = viewMode === 'summary' ? summary : (ocrContent || document.content);
     return translatedContent ?? baseContent ?? '';
-  }, [viewMode, summary, document.content, translatedContent]);
+  }, [viewMode, summary, document.content, ocrContent, translatedContent]);
   
   // Close on Escape key
   useEffect(() => {
@@ -96,6 +102,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
     setViewMode('complete');
     setSummary(null);
     setTranslatedContent(null);
+    setOcrContent(null);
     setInternalSearchQuery(initialSearchQuery);
     setFlashcards([]);
     setSelectedFlashcards({});
@@ -146,7 +153,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   const handleTranslate = async (language: string) => {
     setIsLoadingTranslation(true);
     setTranslationError(null);
-    const contentForTranslation = viewMode === 'summary' ? (summary || '') : document.content;
+    const contentForTranslation = viewMode === 'summary' ? (summary || '') : (ocrContent || document.content);
     try {
       const translatedChunks = await translateDocumentContent(contentForTranslation, language);
       setTranslatedContent(translatedChunks.join('\n\n'));
@@ -165,6 +172,56 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
   const handleRestoreOriginal = () => {
     setTranslatedContent(null);
     setTranslationError(null);
+  };
+
+  // OCR Handler
+  const handleOcrAnalysis = async () => {
+      if (ocrContent) return; // Already done
+      setIsOcrLoading(true);
+      
+      try {
+          // 1. Detect images in Markdown content
+          const imgRegex = /!\[.*?\]\((data:image\/.*?;base64,.*?)\)/g;
+          const matches = [...document.content.matchAll(imgRegex)];
+          
+          if (matches.length === 0) {
+              alert("No se detectaron imágenes integradas para procesar con OCR.");
+              setIsOcrLoading(false);
+              return;
+          }
+
+          let newContent = document.content;
+          let extractedCount = 0;
+
+          // 2. Process each image
+          for (const match of matches) {
+              const fullMatch = match[0];
+              const base64Uri = match[1];
+              const [header, base64Data] = base64Uri.split(',');
+              const mimeType = header.split(':')[1].split(';')[0];
+              
+              const extractedText = await extractTextFromImage(base64Data, mimeType);
+              
+              if (extractedText && extractedText.length > 10) {
+                  // Append extracted text after the image in the content
+                  const replacement = `${fullMatch}\n\n> **[OCR - Texto Detectado]:**\n> ${extractedText.replace(/\n/g, '\n> ')}\n\n`;
+                  newContent = newContent.replace(fullMatch, replacement);
+                  extractedCount++;
+              }
+          }
+          
+          if (extractedCount > 0) {
+              setOcrContent(newContent);
+          } else {
+              alert("No se pudo extraer texto legible de las imágenes.");
+          }
+
+      } catch (error) {
+          console.error("OCR Error:", error);
+          alert("Hubo un error al procesar las imágenes.");
+      } finally {
+          setIsOcrLoading(false);
+      }
   };
 
   const handleDownloadTranslation = () => {
@@ -277,6 +334,14 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
               {isSummaryLoading ? <SpinnerIcon className="w-4 h-4"/> : <SummarizeIcon className="w-4 h-4"/>}
               <span>{viewMode === 'complete' ? 'Resumir' : 'Ver Completo'}</span>
             </button>
+            
+            <button onClick={handleOcrAnalysis} disabled={isOcrLoading || !!ocrContent} className="flex items-center gap-2 text-sm px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-md disabled:bg-slate-800 disabled:opacity-50">
+               {isOcrLoading ? <SpinnerIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+               <span>{isOcrLoading ? 'Escaneando...' : 'Escaneo OCR'}</span>
+            </button>
+
+            <div className="h-6 w-px bg-slate-700 mx-2"></div>
+
             <div className="relative">
               <select value={targetLanguage} onChange={(e) => handleLanguageChange(e.target.value)} disabled={isTranslationLoading} className="bg-slate-700 border border-slate-600 rounded-md py-1.5 pl-2 pr-8 text-sm focus:ring-sky-500 focus:border-sky-500 appearance-none">
                 {ARGOS_LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}

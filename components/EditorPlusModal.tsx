@@ -25,6 +25,7 @@ import EditorSettingsModal, { TEMPLATES } from './EditorSettingsModal';
 import { SummarySettings, FormatSettings } from '../types';
 import { ThesisIcon } from './icons/ThesisIcon';
 import { DocIcon } from './icons/FileIcons';
+import { BuildIcon } from './icons/BuildIcon';
 
 // --- TYPE DEFINITIONS ---
 interface EditorPlusModalProps {
@@ -74,30 +75,34 @@ declare global {
 const ADVANCED_ANALYSIS_SYSTEM_PROMPT = `
 Actúa como un Sistema de Análisis y Procesamiento Documental Multimodal Avanzado.
 
+**IDIOMA DE SALIDA OBLIGATORIO: ESPAÑOL.**
+
 Tu Objetivo Principal: Ingestar, procesar y sintetizar información de cualquier formato de archivo universal (PDF, DOCX, XLSX, TXT, EPUB, PPTX, HTML), independientemente de si el contenido es texto nativo, manuscrito, escaneado o visual.
 
 Instrucciones de Procesamiento por Tipo de Contenido:
 
-1. **Texto Nativo y Estructura:** Lee y comprende la jerarquía del documento (títulos, subtítulos, notas al pie). Mantén la coherencia lógica del argumento o narrativa.
+Texto Nativo y Estructura: Lee y comprende la jerarquía del documento (títulos, subtítulos, notas al pie). Mantén la coherencia lógica del argumento o narrativa.
 
-2. **Archivos Escaneados (OCR):** Si detectas páginas escaneadas o imágenes con texto, asume que se ha aplicado reconocimiento óptico. Tu tarea es corregir posibles errores de lectura (typos, incoherencias) basados en el contexto para transcribir el contenido con precisión.
+Archivos Escaneados (OCR): Si detectas páginas escaneadas o imágenes con texto, aplica reconocimiento óptico de caracteres (OCR) para transcribir el contenido con precisión, corrigiendo posibles errores de lectura basados en el contexto.
 
-3. **Hojas de Cálculo y Tablas (Excel/CSV):** No te limites a leer las celdas. Analiza las relaciones entre filas y columnas. Identifica tendencias, picos, caídas y totales importantes en los datos numéricos presentados en el texto.
+Hojas de Cálculo y Tablas (Excel/CSV): No te limites a leer las celdas. Analiza las relaciones entre filas y columnas. Identifica tendencias, picos, caídas y totales importantes en los datos numéricos.
 
-4. **Elementos Visuales (Gráficos, Diagramas e Imágenes):**
-   - Para Gráficos: Interpreta qué representan los ejes X/Y y cuál es la conclusión o "insight" principal que el gráfico intenta comunicar basado en su descripción textual o datos.
-   - Para Imágenes/Fotos: Integra la descripción del contenido visual relevante para el contexto.
+Elementos Visuales (Gráficos, Diagramas e Imágenes):
+Para Gráficos: Interpreta qué representan los ejes X/Y y cuál es la conclusión o "insight" principal que el gráfico intenta comunicar.
+Para Imágenes/Fotos: Describe el contenido visual si es relevante para el contexto del documento (ej. "La imagen muestra un prototipo dañado...").
 
-Instrucciones para la Generación del Resumen:
-- **Síntesis Integradora:** No separes el texto de las imágenes. Integra la información visual dentro de la narrativa (ej. "Como se observa en el gráfico de ventas de la página 3, hubo un aumento del 20%...").
-- **Puntos Clave:** Enumera los 5-7 hallazgos o ideas más críticas del documento.
-- **Detección de Anomalías:** Si encontraste datos en tablas o gráficos que contradicen el texto, señálalo explícitamente.
-- **Formato de Salida:** Utiliza Markdown para estructurar el resumen (Negritas para énfasis, Bullet points para listas).
+Instrucciones para la Generación del Resumen: Una vez procesada la información, genera el resumen segun lo que se ha programado en los ajustes,
+Síntesis Integradora: No separes el texto de las imágenes. Integra la información visual dentro de la narrativa (ej. "Como se observa en el gráfico de ventas de la página 3, hubo un aumento del 20%...").
+Puntos Clave: Enumera los hallazgos o ideas más críticas del documento.
+Detección de Anomalías: Si encontraste datos en tablas o gráficos que contradicen el texto, señálalo.
+Formato de Salida: Utiliza Markdown para estructurar el resumen (Negritas para énfasis, Bullet points para listas).
 `;
 
 // --- STRATEGIC AUDIT PROMPT ---
 const STRATEGIC_AUDIT_PROMPT = `
 # ROL: EDITOR JEFE DE ANÁLISIS ESTRATÉGICO
+
+**IDIOMA DE RESPUESTA OBLIGATORIO:** ESPAÑOL.
 
 **CONTEXTO:**
 Estás actuando como un auditor de contenido crítico. Tienes ante ti un [DOCUMENTO BASE] real proporcionado por el usuario (el contenido se adjunta a continuación).
@@ -121,7 +126,7 @@ Estás actuando como un auditor de contenido crítico. Tienes ante ti un [DOCUME
 ## OUTPUT REQUERIDO (Estructura Markdown)
 
 ### 1. Diagnóstico del Documento Base
-*(Evalúa la calidad del texto proporcionado. Sé honesto y directo.)*
+*(Evalúa la calidad del texto proporcionado en ESPAÑOL. Sé honesto y directo.)*
 
 ### 2. Brechas de Información Detectadas
 *   **Brecha 1:** [Descripción del vacío específico en el texto]
@@ -132,7 +137,68 @@ Estás actuando como un auditor de contenido crítico. Tienes ante ti un [DOCUME
 *   **Investigar:** [Tema específico externo necesario para llenar los vacíos]
 *   **Verificar:** [Dato del texto que requiere confirmación externa]
 
-**ADVERTENCIA FINAL:** Tu análisis debe estar estrictamente anclado al texto proporcionado. No hables de generalidades. Habla de ESTE documento.
+**ADVERTENCIA FINAL:** Tu análisis debe estar estrictamente anclado al texto proporcionado. No hables de generalidades. Habla de ESTE documento. Genera todo el reporte en ESPAÑOL.
+`;
+
+// --- SAEP PROMPT ---
+const SAEP_PROMPT = `
+# SISTEMA DE ANÁLISIS, EVALUACIÓN Y PERFECCIONAMIENTO (SAEP)
+
+**ROL:** Actúa como un Analista Senior Multidisciplinario y Editor de Contenidos. Tienes la capacidad de adaptar tu lente crítico según el tipo de documento que recibas (ej. rigor académico para historia, viabilidad financiera para negocios, precisión técnica para manuales).
+
+**OBJETIVO:** Recibir un [TEXTO BASE], auditar su calidad, detectar vacíos de información, investigar externamente para subsanarlos y generar una **VERSIÓN EVOLUCIONADA** del informe.
+
+---
+
+## 1. MOTOR DE PROCESAMIENTO (Cadena de Pensamiento)
+
+Ejecuta internamente los siguientes pasos lógicos antes de generar la respuesta:
+
+**PASO A: RECONOCIMIENTO DE DOMINIO Y ESTÁNDAR**
+* Identifica el tema (¿Es Historia? ¿Negocios? ¿Ciencia? ¿Biografía?).
+* Establece el "Estándar de Oro" para ese dominio.
+    * *Ejemplo:* Si es Historia -> Busca causalidad y fuentes. Si es Negocios -> Busca cifras y proyecciones. Si es Técnico -> Busca especificaciones y seguridad, etcetera
+
+**PASO B: AUDITORÍA DE CALIDAD (Gap Analysis)**
+* Compara el [TEXTO BASE] contra el Estándar de Oro (auditoria).
+* Detecta "Cajas Negras": Afirmaciones hechas sin evidencia o explicación.
+* Detecta "Silencios": Actores, datos o variables que deberían estar ahí pero no están.
+
+**PASO C: INVESTIGACIÓN ACTIVA (Navegación Web)**
+* Utiliza tus herramientas de búsqueda para llenar EXCLUSIVAMENTE los huecos detectados en el Paso B.
+* Valida la vigencia de la información (¿Hay datos más recientes que los del texto base?).
+
+**PASO D: SÍNTESIS INTEGRAL**
+* Reescribe el contenido fusionando la estructura original con los nuevos hallazgos. No elimines la información del usuario a menos que sea factualmente incorrecta; enriquécela.
+
+---
+
+## 2. FORMATO DE SALIDA (INFORME FINAL ESTANDARIZADO)
+
+**IDIOMA DE RESPUESTA OBLIGATORIO:** ESPAÑOL.
+
+Presenta el resultado final con esta estructura obligatoria:
+
+### 1. Ficha de Evaluación (Diagnóstico)
+* **Tipo de Documento Detectado:** [Ej. Informe Histórico / Propuesta de Negocios]
+* **Nivel de Profundidad Original:** [Básico / Intermedio / Avanzado]
+* **Brechas Detectadas:** (Lista breve de lo que le faltaba al texto original y que has solucionado).
+
+### 2. Informe Final Evolucionado (El Resultado)
+*(Aquí desarrollas el contenido mejorado. El tono debe adaptarse al tipo de documento).*
+
+* **Síntesis Ejecutiva:** Resumen de alto nivel que integra el input original + el contexto clave encontrado.
+* **Cuerpo del Análisis (Enriquecido):** Desarrollo del tema. Aquí debes integrar los "Datos Faltantes" que encontraste en tu investigación. Usa negritas para resaltar los hallazgos nuevos que no estaban en el texto original.
+* **Perspectiva Crítica/Actual:** Si aplica, añade una sección sobre la relevancia actual del tema, implicaciones futuras o riesgos (dependiendo del dominio).
+* **Conclusión:** Cierre contundente que valide la tesis o propuesta principal.
+
+### 3. Referencias y Fuentes Añadidas
+* Lista las fuentes externas que utilizaste para mejorar el documento original.
+
+**INSTRUCCIONES DE CONTROL:**
+* Si el texto es **Técnico**, prioriza la precisión sobre el estilo.
+* Si el texto es **Narrativo/Histórico**, prioriza el contexto y la causalidad.
+* Si el texto es **Comercial**, prioriza los datos duros y la propuesta de valor.
 `;
 
 // --- HELPER & UTILITY COMPONENTS ---
@@ -180,11 +246,13 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-  // Strategic Audit State
+  // Strategic Audit & Analysis State
   const [isAuditing, setIsAuditing] = useState(false);
+  const [isSaepRunning, setIsSaepRunning] = useState(false);
   const [auditResult, setAuditResult] = useState<string>('');
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditReports, setAuditReports] = useState<AuditReport[]>([]);
+  const [analysisModalConfig, setAnalysisModalConfig] = useState<{title: string, icon: React.ReactElement}>({ title: '', icon: <></> });
 
   // Summary State
   const [summaryContent, setSummaryContent] = useState<string>('');
@@ -194,6 +262,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
   // Preview State
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<string>('');
+  const [previewImage, setPreviewImage] = useState<{ src: string, mimeType: string } | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   // Cloud-connected state
@@ -245,8 +314,8 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       showToast(`Ajustes aplicados: ${newFormat.standard}`, 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
   };
   
-  // File Reading Logic
-  const readFileContent = async (file: File): Promise<string> => {
+  // Refactored File Reading Logic to support Multimodal Inputs
+  const readSourceFile = async (file: File): Promise<{ type: 'text' | 'image'; content: string; mimeType?: string }> => {
       // PDF Parsing logic using PDF.js
       if (file.type === 'application/pdf') {
           try {
@@ -262,33 +331,38 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                   const page = await pdf.getPage(i);
                   const textContent = await page.getTextContent();
                   const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                  fullText += pageText + '\n\n';
+                  fullText += `--- Página ${i} ---\n${pageText}\n\n`;
               }
               
               if (!fullText.trim()) {
-                  return "Advertencia: Se detectó un PDF pero no se pudo extraer texto. Posiblemente sea una imagen escaneada sin capa de texto (requiere OCR).";
+                  // Fallback for scanned PDFs could go here, but for now warning.
+                  return { type: 'text', content: "Advertencia: Se detectó un PDF pero no se pudo extraer texto. Posiblemente sea una imagen escaneada sin capa de texto. Intente subir el documento como imagen (.jpg, .png) para aplicar OCR avanzado." };
               }
               
-              return fullText;
+              return { type: 'text', content: fullText };
           } catch (e) {
               console.error("PDF extraction error:", e);
               throw new Error("Fallo al leer el PDF. Asegúrese de que el archivo es válido.");
           }
       } 
       
-      // Image Processing (OCR simulation via Gemini Vision if available or assetService)
+      // Image Processing: Return base64 for Multimodal analysis
       if (file.type.startsWith('image/')) {
-         try {
-             return await assetService.extractTextFromImage(file);
-         } catch (e) {
-             throw new Error("Fallo al realizar OCR en la imagen.");
-         }
+         return new Promise((resolve, reject) => {
+             const reader = new FileReader();
+             reader.onload = (e) => {
+                 const base64Data = (e.target?.result as string).split(',')[1];
+                 resolve({ type: 'image', content: base64Data, mimeType: file.type });
+             };
+             reader.onerror = () => reject(new Error("Error al leer el archivo de imagen."));
+             reader.readAsDataURL(file);
+         });
       }
       
       // Standard Text Reading
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onload = (e) => resolve({ type: 'text', content: e.target?.result as string });
           reader.onerror = (e) => reject(new Error("Error al leer el archivo de texto."));
           reader.readAsText(file);
       });
@@ -298,9 +372,16 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     if (!summarySettings.sourceFile) return;
 
     setIsPreviewLoading(true);
+    setPreviewContent('');
+    setPreviewImage(null);
     try {
-        const text = await readFileContent(summarySettings.sourceFile);
-        setPreviewContent(text);
+        const result = await readSourceFile(summarySettings.sourceFile);
+        
+        if (result.type === 'image') {
+            setPreviewImage({ src: `data:${result.mimeType};base64,${result.content}`, mimeType: result.mimeType || '' });
+        } else {
+            setPreviewContent(result.content);
+        }
         setIsPreviewModalOpen(true);
     } catch (e) {
         showToast("Error al abrir vista previa.", 3000, <XIcon className="w-5 h-5 text-red-400"/>);
@@ -321,8 +402,10 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     showToast("Ingestando y procesando documento...", 0);
 
     try {
-        const text = await readFileContent(settings.sourceFile);
-        if (!text || text.length < 50) {
+        const sourceData = await readSourceFile(settings.sourceFile);
+        
+        // Validation for empty text (only if not an image)
+        if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.length < 50)) {
              throw new Error("El documento parece estar vacío o no se pudo extraer texto legible.");
         }
 
@@ -352,12 +435,21 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
             ${userPreferencePrompt}
 
             2. **Estándar de Formato:** El resumen debe respetar normas de citación y estilo "${formatSettings.standard}" donde aplique.
+            
+            ${sourceData.type === 'image' ? '**NOTA:** El input es una IMAGEN. Realiza un reconocimiento visual completo (OCR) del texto contenido en ella antes de resumir.' : ''}
 
-            ---
-            **CONTENIDO DEL DOCUMENTO INGESTADO:**
+            **RECUERDA: TODO EL OUTPUT DEBE SER EN ESPAÑOL.**
         `;
 
-        const summary = await generateCustomSummary(text, compositePrompt);
+        let summary;
+        if (sourceData.type === 'image') {
+            // Pass image data to multimodal summary generator
+            summary = await generateCustomSummary('', compositePrompt, { data: sourceData.content, mimeType: sourceData.mimeType! });
+        } else {
+            // Text only analysis
+            summary = await generateCustomSummary(sourceData.content, compositePrompt);
+        }
+
         setSummaryContent(summary);
         
         const newReport: SummaryReport = {
@@ -380,35 +472,36 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     }
   };
 
+  const getErrorCard = () => `
+    <div class="flex flex-col items-center justify-center p-8 text-center space-y-6">
+        <div class="w-16 h-16 bg-amber-900/30 rounded-full flex items-center justify-center border border-amber-500/50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold text-white mb-2">Documento Base No Detectado</h3>
+            <p class="text-gray-400 max-w-md mx-auto">
+                Para realizar este análisis, el sistema necesita procesar un archivo fuente real. Actualmente no hay ningún documento cargado.
+            </p>
+        </div>
+        
+        <div class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg p-4 text-left shadow-lg">
+            <h4 class="text-sm font-semibold text-sky-400 uppercase tracking-wider mb-3 border-b border-slate-700 pb-2">Sugerencia para resolver:</h4>
+            <ol class="list-decimal list-inside space-y-3 text-sm text-gray-300">
+                <li>Ubica el botón de <strong class="text-white">Ajustes</strong> (icono de engranaje) en la columna derecha.</li>
+                <li>En la pestaña <strong class="text-white">Resumen con IA</strong>, sube tu archivo (PDF, DOCX o IMAGEN).</li>
+                <li>Cierra los ajustes y vuelve a ejecutar la herramienta.</li>
+            </ol>
+        </div>
+    </div>
+  `;
+
   const handleRunStrategicAudit = async () => {
-      // 1. Strict Requirement: Base Document must exist
+      setAnalysisModalConfig({ title: 'Resultado de Auditoría Estratégica', icon: <ThesisIcon className="w-5 h-5 text-amber-400"/> });
+      
       if (!summarySettings.sourceFile) {
-          const errorCardHtml = `
-            <div class="flex flex-col items-center justify-center p-8 text-center space-y-6">
-                <div class="w-16 h-16 bg-amber-900/30 rounded-full flex items-center justify-center border border-amber-500/50">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-white mb-2">Documento Base No Detectado</h3>
-                    <p class="text-gray-400 max-w-md mx-auto">
-                        Para realizar una Auditoría Estratégica, el "Editor Jefe" necesita analizar un archivo fuente real. Actualmente no hay ningún documento cargado.
-                    </p>
-                </div>
-                
-                <div class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg p-4 text-left shadow-lg">
-                    <h4 class="text-sm font-semibold text-sky-400 uppercase tracking-wider mb-3 border-b border-slate-700 pb-2">Sugerencia para resolver:</h4>
-                    <ol class="list-decimal list-inside space-y-3 text-sm text-gray-300">
-                        <li>Ubica el botón de <strong class="text-white">Ajustes</strong> (icono de engranaje) en la columna derecha.</li>
-                        <li>En la pestaña <strong class="text-white">Resumen con IA</strong>, sube tu archivo (PDF, DOCX).</li>
-                        <li>Cierra los ajustes y vuelve a ejecutar la Auditoría.</li>
-                    </ol>
-                </div>
-            </div>
-          `;
-          
-          setAuditResult(errorCardHtml);
+          setAuditResult(getErrorCard());
           setShowAuditModal(true);
           return;
       }
@@ -417,17 +510,21 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       showToast("Inicializando Auditoría Estratégica...", 0);
 
       try {
-          // 2. Read ACTUAL content
-          const content = await readFileContent(summarySettings.sourceFile);
+          const sourceData = await readSourceFile(summarySettings.sourceFile);
 
-          if (!content || content.trim().length < 50) {
+          if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 50)) {
               throw new Error("El documento base parece estar vacío o no contiene texto legible.");
           }
 
           showToast("Analizando documento base...", 0);
           
-          // 3. Generate using Base Doc Content + Strict Prompt
-          const result = await generateCustomSummary(content, STRATEGIC_AUDIT_PROMPT);
+          let result;
+          if (sourceData.type === 'image') {
+              const imagePrompt = STRATEGIC_AUDIT_PROMPT + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Analiza visualmente todo el texto contenido y trátalo como el [DOCUMENTO BASE]. Ignora artefactos irrelevantes.\n`;
+              result = await generateCustomSummary('', imagePrompt, { data: sourceData.content, mimeType: sourceData.mimeType! });
+          } else {
+              result = await generateCustomSummary(sourceData.content, STRATEGIC_AUDIT_PROMPT);
+          }
           
           if (!result) throw new Error("La IA no devolvió resultados.");
 
@@ -445,16 +542,63 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       } catch (e) {
           console.error("Strategic Audit Failed", e);
           const msg = e instanceof Error ? e.message : "Error desconocido.";
-           const errorHtml = `
-            <div class="p-6 text-center">
-                <h3 class="text-xl font-bold text-red-400">Error de Procesamiento</h3>
-                <p class="text-gray-300 mt-2">${msg}</p>
-            </div>
-          `;
-          setAuditResult(errorHtml);
+          setAuditResult(`<div class="p-6 text-center"><h3 class="text-xl font-bold text-red-400">Error de Procesamiento</h3><p class="text-gray-300 mt-2">${msg}</p></div>`);
           setShowAuditModal(true);
       } finally {
           setIsAuditing(false);
+      }
+  };
+
+  const handleRunSaep = async () => {
+      setAnalysisModalConfig({ title: 'Resultado de Análisis SAEP', icon: <BuildIcon className="w-5 h-5 text-sky-400"/> });
+
+      if (!summarySettings.sourceFile) {
+          setAuditResult(getErrorCard());
+          setShowAuditModal(true);
+          return;
+      }
+      
+      setIsSaepRunning(true);
+      showToast("Iniciando Sistema SAEP...", 0);
+      
+      try {
+          const sourceData = await readSourceFile(summarySettings.sourceFile);
+           if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 50)) {
+              throw new Error("El documento base parece estar vacío o no contiene texto legible.");
+          }
+          
+          showToast("Ejecutando diagnóstico y búsqueda...", 0);
+
+          let result;
+          // Use search enabled for SAEP (4th argument = true)
+          if (sourceData.type === 'image') {
+               const imagePrompt = SAEP_PROMPT + `\n**INSTRUCCIÓN OCR VISUAL:**\nEl documento base es una IMAGEN. Extrae todo el texto visual y úsalo como [TEXTO BASE].\n`;
+               result = await generateCustomSummary('', imagePrompt, { data: sourceData.content, mimeType: sourceData.mimeType! }, true);
+          } else {
+               result = await generateCustomSummary(sourceData.content, SAEP_PROMPT, undefined, true);
+          }
+
+          if (!result) throw new Error("La IA no devolvió resultados.");
+          
+          setAuditResult(result);
+          setShowAuditModal(true);
+
+          const newReport: AuditReport = {
+              id: `saep-${Date.now()}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              content: result
+          };
+          setAuditReports(prev => [newReport, ...prev]);
+          
+          showToast("Análisis SAEP completado.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
+
+      } catch (e) {
+          console.error("SAEP Failed", e);
+          const msg = e instanceof Error ? e.message : "Error desconocido.";
+          setAuditResult(`<div class="p-6 text-center"><h3 class="text-xl font-bold text-red-400">Error en SAEP</h3><p class="text-gray-300 mt-2">${msg}</p></div>`);
+          setShowAuditModal(true);
+      } finally {
+          setIsSaepRunning(false);
       }
   };
 
@@ -722,11 +866,15 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                     </li>
                   )) : <li className="text-gray-500 italic">No hay encabezados.</li>}
                 </ul>
-                <div className="mt-4 pt-4 border-t border-slate-700">
+                <div className="mt-4 pt-4 border-t border-slate-700 space-y-2">
                     <h4 className="text-xs font-semibold text-sky-400 uppercase mb-2">Herramientas de Análisis</h4>
-                    <button onClick={handleRunStrategicAudit} disabled={isAuditing} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-gray-200 rounded-md transition-colors disabled:opacity-50">
+                    <button onClick={handleRunStrategicAudit} disabled={isAuditing || isSaepRunning} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-gray-200 rounded-md transition-colors disabled:opacity-50">
                         {isAuditing ? <SpinnerIcon className="w-4 h-4" /> : <ThesisIcon className="w-4 h-4 text-amber-400" />}
                         {isAuditing ? 'Auditando...' : 'Auditoría Estratégica'}
+                    </button>
+                    <button onClick={handleRunSaep} disabled={isAuditing || isSaepRunning} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-gray-200 rounded-md transition-colors disabled:opacity-50">
+                        {isSaepRunning ? <SpinnerIcon className="w-4 h-4" /> : <BuildIcon className="w-4 h-4 text-sky-400" />}
+                        {isSaepRunning ? 'Procesando SAEP...' : 'Análisis SAEP'}
                     </button>
                 </div>
               </div>
@@ -871,7 +1019,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                                       <p className="text-xs text-gray-300 font-medium truncate">Auditoría {report.timestamp}</p>
                                       <div className="flex gap-1 opacity-60 group-hover:opacity-100">
                                           <button onClick={() => downloadReport(report.content, 'Auditoria')} className="p-1 hover:bg-slate-600 rounded text-sky-400"><DownloadIcon className="w-3 h-3"/></button>
-                                          <button onClick={() => { setAuditResult(report.content); setShowAuditModal(true); }} className="p-1 hover:bg-slate-600 rounded text-gray-400"><EyeIcon className="w-3 h-3"/></button>
+                                          <button onClick={() => { setAuditResult(report.content); setAnalysisModalConfig({title: 'Reporte Archivado', icon: <ThesisIcon className="w-4 h-4"/>}); setShowAuditModal(true); }} className="p-1 hover:bg-slate-600 rounded text-gray-400"><EyeIcon className="w-3 h-3"/></button>
                                       </div>
                                   </div>
                               )) : <p className="text-xs text-gray-500 italic p-1">Sin auditorías.</p>}
@@ -964,14 +1112,14 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       </div>
       {isPublishModalOpen && <PublishModal onClose={() => setIsPublishModalOpen(false)} onConfirm={() => { showToast('Publicado', 3000, <CheckIcon className="w-5 h-5 text-green-400"/>); setIsPublishModalOpen(false); }} />}
 
-      {/* STRATEGIC AUDIT MODAL */}
+      {/* ANALYSIS RESULT MODAL (Shared for Audit and SAEP) */}
       {showAuditModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70]" onClick={() => setShowAuditModal(false)}>
               <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-xl w-full max-w-3xl m-4 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                   <header className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
                       <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                          <ThesisIcon className="w-5 h-5 text-amber-400"/>
-                          Resultado de Auditoría Estratégica
+                          {analysisModalConfig.icon}
+                          {analysisModalConfig.title}
                       </h2>
                       <button onClick={() => setShowAuditModal(false)} className="text-gray-400 hover:text-white"><XIcon className="w-6 h-6"/></button>
                   </header>
@@ -983,7 +1131,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                   </div>
                   <footer className="p-4 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
                       <button onClick={() => { navigator.clipboard.writeText(auditResult); showToast("Copiado al portapapeles", 2000, <CheckIcon className="w-5 h-5 text-green-400"/>); }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white flex items-center gap-2"><ClipboardIcon className="w-4 h-4"/> Copiar</button>
-                      <button onClick={() => { insertHtmlInEditor(`<hr/><h3>Reporte de Auditoría</h3><pre style="background:#1e293b;padding:10px;border-radius:4px;white-space:pre-wrap;">${auditResult}</pre><p><br/></p>`); setShowAuditModal(false); }} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded text-sm text-white">Insertar al Final</button>
+                      <button onClick={() => { insertHtmlInEditor(`<hr/><h3>Reporte de Análisis</h3><pre style="background:#1e293b;padding:10px;border-radius:4px;white-space:pre-wrap;">${auditResult}</pre><p><br/></p>`); setShowAuditModal(false); }} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded text-sm text-white">Insertar al Final</button>
                   </footer>
               </div>
           </div>
@@ -1008,6 +1156,10 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
                                <SpinnerIcon className="w-10 h-10 text-sky-400 mb-2"/>
                                <p className="text-gray-400">Cargando vista previa...</p>
                            </div>
+                      ) : previewImage ? (
+                          <div className="flex justify-center items-center">
+                              <img src={previewImage.src} alt="Document Preview" className="max-w-full rounded shadow-lg border border-slate-700" />
+                          </div>
                       ) : (
                           <div className="prose prose-invert max-w-none">
                               <pre className="whitespace-pre-wrap font-sans text-gray-300 leading-relaxed text-sm">

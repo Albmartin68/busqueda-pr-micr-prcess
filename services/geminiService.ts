@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { SearchResult, FilterOptions, DocumentResult, VideoResult, NewsResult, ForumResult, EventResult, MagazineResult } from '../types';
 import { LANGUAGE_OPTIONS } from '../constants';
@@ -285,20 +286,39 @@ export const summarizeContent = async (content: string): Promise<string> => {
     }
 };
 
-export const generateCustomSummary = async (content: string, promptInstruction: string): Promise<string> => {
+export const generateCustomSummary = async (content: string, promptInstruction: string, image?: { data: string, mimeType: string }, useSearch: boolean = false): Promise<string> => {
     const ai = getAI();
-    const prompt = `
-        ${promptInstruction}
-
-        --- DOCUMENT CONTENT TO SUMMARIZE ---
-        ${content}
-        --- END OF CONTENT ---
-    `;
+    
+    // Construct the parts array for the request
+    let parts: any[] = [];
+    
+    if (image) {
+        // If image is present, it's the primary content for multimodal analysis
+        parts.push({ text: promptInstruction }); // The prompt describes what to do with the image
+        parts.push({
+            inlineData: {
+                data: image.data,
+                mimeType: image.mimeType
+            }
+        });
+    } else {
+        // Text-only mode
+        parts.push({ text: `${promptInstruction}\n\n--- DOCUMENT CONTENT ---\n${content}\n--- END OF CONTENT ---` });
+    }
 
     try {
+        // Use flash for multimodal inputs as it handles images + text efficiently.
+        // If useSearch is true, we must use a model that supports tools (flash or pro). 
+        // We stick to 'gemini-2.5-flash' for general speed/multimodal, or upgrade to 'gemini-2.5-pro' if needed.
+        // For simplicity and consistency with existing code:
+        const model = image ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+
+        const config = useSearch ? { tools: [{googleSearch: {}}] } : undefined;
+
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro', // Use Pro model for higher quality complex summaries
-            contents: prompt,
+            model: model,
+            contents: { parts },
+            config: config
         });
         return response.text ?? 'No se pudo generar el resumen.';
     } catch (error) {
@@ -309,7 +329,7 @@ export const generateCustomSummary = async (content: string, promptInstruction: 
 
 export const generateImageCaption = async (base64Image: string, mimeType: string): Promise<string> => {
     const ai = getAI();
-    const prompt = "Describe this image for a document caption. Be concise and descriptive.";
+    const prompt = "Describe this image for a document caption. Be concise and descriptive. Respond in Spanish.";
     
     const imagePart = {
       inlineData: {
@@ -323,16 +343,16 @@ export const generateImageCaption = async (base64Image: string, mimeType: string
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: prompt }, imagePart] },
       });
-      return response.text ?? "Image description not available.";
+      return response.text ?? "Descripción no disponible.";
     } catch (error) {
       console.error("Error generating image caption:", error);
-      return "Image description not available.";
+      return "Descripción no disponible.";
     }
 };
 
 export const extractTextFromImage = async (base64Image: string, mimeType: string): Promise<string> => {
     const ai = getAI();
-    const prompt = "Extract all text from this image. If there is no text, respond with an empty string. Only return the extracted text, nothing else.";
+    const prompt = "Analiza y extrae todo el texto legible de esta imagen. Si hay texto, transcríbelo manteniendo el formato original en la medida de lo posible. Si no hay texto, responde con una cadena vacía.";
 
     const imagePart = {
         inlineData: {
@@ -346,10 +366,10 @@ export const extractTextFromImage = async (base64Image: string, mimeType: string
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }, imagePart] },
         });
-        return response.text ?? "Could not extract text from image.";
+        return response.text ?? "No se pudo extraer texto de la imagen.";
     } catch (error) {
         console.error("Error extracting text from image:", error);
-        return "Could not extract text from image.";
+        return "No se pudo extraer texto de la imagen.";
     }
 };
 
@@ -361,7 +381,7 @@ export const analyzeRepository = async (repoUrl: string, analysisTopic: string):
         Your task is to generate a section for a professional technical document based on the following topic:
         **Topic: ${analysisTopic}**
 
-        Provide your response in well-formatted Markdown.
+        Provide your response in well-formatted Markdown in SPANISH.
         Do not include any introductory phrases like "Here is the section..." or "Based on the repository...".
         Directly generate the raw Markdown content for the requested section.
         If the repository is inaccessible or you cannot perform the analysis, respond with a clear error message in Markdown.
@@ -372,14 +392,14 @@ export const analyzeRepository = async (repoUrl: string, analysisTopic: string):
             model: 'gemini-2.5-pro', // Using a more powerful model for complex analysis
             contents: prompt,
             config: {
-                systemInstruction: `You are a world-class senior software architect and technical writer. Your task is to analyze a given public GitHub repository and generate sections of a professional technical document. You must infer the project's architecture, purpose, and potential issues from the repository's structure and any available code snippets or documentation, as you do not have direct file access.`,
+                systemInstruction: `You are a world-class senior software architect and technical writer. Your task is to analyze a given public GitHub repository and generate sections of a professional technical document. You must infer the project's architecture, purpose, and potential issues from the repository's structure and any available code snippets or documentation, as you do not have direct file access. RESPOND IN SPANISH.`,
             },
         });
-        return response.text ?? `### Error Analyzing Repository\n\nCould not generate the section for "${analysisTopic}".\n\n**Reason:** No content was returned by the model.`;
+        return response.text ?? `### Error Analizando Repositorio\n\nNo se pudo generar la sección para "${analysisTopic}".\n\n**Razón:** No se devolvió contenido.`;
     } catch (error) {
         console.error(`Error analyzing repository for topic '${analysisTopic}':`, error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return `### Error Analyzing Repository\n\nCould not generate the section for "${analysisTopic}".\n\n**Reason:** ${errorMessage}`;
+        return `### Error Analizando Repositorio\n\nNo se pudo generar la sección para "${analysisTopic}".\n\n**Razón:** ${errorMessage}`;
     }
 };
 
@@ -424,6 +444,7 @@ export const generateExecutiveSummary = async (documentText: string): Promise<st
         It must have a Flesch-Kincaid readability score of 12 or lower.
         The summary must include the project's main objective and its key result or conclusion.
         Return ONLY the summary text, without any headers or introductory phrases.
+        Respond in SPANISH.
 
         --- DOCUMENT TEXT ---
         ${documentText}
@@ -448,6 +469,7 @@ export const generateRelatedWork = async (repoUrl: string, documentText: string)
         3.  Generate a comparative paragraph that discusses how this project relates to at least 3 other similar or foundational technologies/papers.
         4.  The tone should be academic and professional.
         Return ONLY the Markdown content for the "Related Work" section.
+        Respond in SPANISH.
 
         --- DOCUMENT TEXT ---
         ${documentText}
@@ -471,6 +493,7 @@ export const generateGlossary = async (documentText: string): Promise<string> =>
         *   **Term 1**: Brief definition.
         *   **Term 2**: Brief definition.
         Return ONLY the Markdown list for the "Glossary" section.
+        Respond in SPANISH.
 
         --- DOCUMENT TEXT ---
         ${documentText}
@@ -494,6 +517,7 @@ export const generateAuditChecklist = async (repoUrl: string, documentText: stri
         Map the document's content to common ISO requirements like risk management, requirement traceability, and monitoring.
         Infer the status based on whether evidence is present in the document.
         Return ONLY the Markdown table for the "Check-list de Auditoría" section.
+        Respond in SPANISH.
 
         --- DOCUMENT TEXT ---
         ${documentText}
@@ -517,6 +541,7 @@ export const generateAnalyticalIndex = async (documentText: string): Promise<str
         Format the output as a two-column Markdown table: "Término" and "Página".
         The list of terms must be sorted alphabetically.
         Return ONLY the Markdown table for the "Índice Analítico" section.
+        Respond in SPANISH.
 
         --- DOCUMENT TEXT ---
         ${documentText}
