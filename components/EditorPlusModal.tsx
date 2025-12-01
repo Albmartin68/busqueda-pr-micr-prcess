@@ -16,6 +16,7 @@ import { assetService } from '../services/editorPlus/assetService';
 import { renderService } from '../services/editorPlus/renderService';
 import { docService } from '../services/editorPlus/docService';
 import { generateCustomSummary } from '../services/geminiService';
+import { historyService } from '../services/historyService';
 import { EditorPlusIcon } from './icons/EditorPlusIcon';
 import { HistoryIcon } from './icons/HistoryIcon';
 import { UploadCloudIcon } from './icons/UploadCloudIcon';
@@ -64,10 +65,11 @@ export interface SummaryReport {
 export type CitationStyle = 'APA' | 'MLA' | 'Chicago';
 type SyncStatus = 'synced' | 'saving' | 'edited' | 'offline';
 
-// Declare global PDF lib
+// Declare global PDF lib and JSZip
 declare global {
   interface Window {
     pdfjsLib: any;
+    JSZip: any;
   }
 }
 
@@ -314,9 +316,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       showToast(`Ajustes aplicados: ${newFormat.standard}`, 2000, <CheckIcon className="w-5 h-5 text-green-400"/>);
   };
   
-  // Refactored File Reading Logic to support Multimodal Inputs
+  // Refactored File Reading Logic to support Multimodal Inputs (PDF, DOCX, Image, Text)
   const readSourceFile = async (file: File): Promise<{ type: 'text' | 'image'; content: string; mimeType?: string }> => {
-      // PDF Parsing logic using PDF.js
+      // 1. PDF Parsing logic using PDF.js
       if (file.type === 'application/pdf') {
           try {
               if (!window.pdfjsLib) {
@@ -335,8 +337,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               }
               
               if (!fullText.trim()) {
-                  // Fallback for scanned PDFs could go here, but for now warning.
-                  return { type: 'text', content: "Advertencia: Se detectó un PDF pero no se pudo extraer texto. Posiblemente sea una imagen escaneada sin capa de texto. Intente subir el documento como imagen (.jpg, .png) para aplicar OCR avanzado." };
+                  // If extraction failed, return a special warning instead of throwing outright
+                  // This allows the process to continue if there's at least *some* metadata
+                  return { type: 'text', content: "Advertencia: Se detectó un PDF pero no se pudo extraer texto. El archivo puede ser una imagen escaneada." };
               }
               
               return { type: 'text', content: fullText };
@@ -346,7 +349,38 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
           }
       } 
       
-      // Image Processing: Return base64 for Multimodal analysis
+      // 2. Word Document (DOCX) parsing using JSZip
+      if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')) {
+          try {
+              if (!window.JSZip) {
+                  throw new Error("La librería JSZip no está disponible.");
+              }
+              const arrayBuffer = await file.arrayBuffer();
+              const zip = await new window.JSZip().loadAsync(arrayBuffer);
+              const docXml = await zip.file("word/document.xml")?.async("string");
+              
+              if (!docXml) {
+                   throw new Error("No se encontró contenido válido en el archivo Word.");
+              }
+              
+              // Simple Regex to extract text from XML tags to avoid DOMParser overhead/issues
+              const parser = new DOMParser();
+              const xmlDoc = parser.parseFromString(docXml, "text/xml");
+              const paragraphs = xmlDoc.getElementsByTagName("w:p");
+              let fullText = "";
+              
+              for (let i = 0; i < paragraphs.length; i++) {
+                  fullText += paragraphs[i].textContent + "\n";
+              }
+              
+              return { type: 'text', content: fullText };
+          } catch (e) {
+              console.error("DOCX extraction error:", e);
+              throw new Error("Fallo al leer el archivo DOCX. Intente convertirlo a PDF o Texto.");
+          }
+      }
+
+      // 3. Image Processing: Return base64 for Multimodal analysis
       if (file.type.startsWith('image/')) {
          return new Promise((resolve, reject) => {
              const reader = new FileReader();
@@ -359,7 +393,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
          });
       }
       
-      // Standard Text Reading
+      // 4. Standard Text Reading (Fallback)
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve({ type: 'text', content: e.target?.result as string });
@@ -405,7 +439,8 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
         const sourceData = await readSourceFile(settings.sourceFile);
         
         // Validation for empty text (only if not an image)
-        if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.length < 50)) {
+        // Lowered threshold to 20 chars to allow very short notes
+        if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
              throw new Error("El documento parece estar vacío o no se pudo extraer texto legible.");
         }
 
@@ -459,6 +494,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
             type: settings.template === 'personalized' ? 'Personalizado' : TEMPLATES.find(t => t.id === settings.template)?.label || 'Resumen'
         };
         setSummaryReports(prev => [newReport, ...prev]);
+        
+        // Save to History
+        historyService.addItem('Editor_Plus', 'Resumen', `resumen_${settings.sourceFile.name}`, summary);
 
         showToast("Análisis completado exitosamente.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
 
@@ -512,7 +550,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       try {
           const sourceData = await readSourceFile(summarySettings.sourceFile);
 
-          if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 50)) {
+          if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
               throw new Error("El documento base parece estar vacío o no contiene texto legible.");
           }
 
@@ -537,6 +575,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               content: result
           };
           setAuditReports(prev => [newReport, ...prev]);
+
+          // Save to History
+          historyService.addItem('Editor_Plus', 'Auditoría', `auditoria_${summarySettings.sourceFile.name}`, result);
 
           showToast("Auditoría finalizada con éxito.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
       } catch (e) {
@@ -563,7 +604,7 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
       
       try {
           const sourceData = await readSourceFile(summarySettings.sourceFile);
-           if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 50)) {
+           if (sourceData.type === 'text' && (!sourceData.content || sourceData.content.trim().length < 20)) {
               throw new Error("El documento base parece estar vacío o no contiene texto legible.");
           }
           
@@ -589,6 +630,9 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
               content: result
           };
           setAuditReports(prev => [newReport, ...prev]);
+
+          // Save to History
+          historyService.addItem('Editor_Plus', 'SAEP', `analisis_saep_${summarySettings.sourceFile.name}`, result);
           
           showToast("Análisis SAEP completado.", 3000, <CheckIcon className="w-5 h-5 text-green-400"/>);
 
@@ -624,6 +668,8 @@ const EditorPlusModal: React.FC<EditorPlusModalProps> = ({ onClose }) => {
     setSyncStatus('saving');
     try {
         await docService.saveDocument('doc-1', editorRef.current.innerHTML);
+        // Save full document snapshot to history on "save"
+        historyService.addItem('Editor_Plus', 'Documento', 'documento_maestro', editorRef.current.innerText);
         setSyncStatus('synced');
     } catch (e) {
         setSyncStatus('offline');

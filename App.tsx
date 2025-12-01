@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { SearchResult, DocumentResult, FilterOptions, ActiveTab } from './types';
 import { fetchSearchResults } from './services/geminiService';
@@ -16,6 +17,7 @@ import WorkbenchModal from './components/WorkbenchModal';
 import EditorPlusModal from './components/EditorPlusModal';
 import TechnicalDocGeneratorModal from './components/TechnicalDocGeneratorModal';
 import InteractiveGuideModal from './components/InteractiveGuideModal';
+import GlobalHistoryModal from './components/GlobalHistoryModal';
 
 export default function App(): React.ReactElement {
   const [query, setQuery] = useState<string>('');
@@ -31,6 +33,7 @@ export default function App(): React.ReactElement {
   const [isEditorPlusOpen, setIsEditorPlusOpen] = useState<boolean>(false);
   const [isTechnicalDocGeneratorOpen, setIsTechnicalDocGeneratorOpen] = useState<boolean>(false);
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState<number>(0);
   const [libraryQuery, setLibraryQuery] = useState<string>('');
   const timerRef = useRef<number | null>(null);
@@ -135,6 +138,7 @@ export default function App(): React.ReactElement {
         onEditorPlusClick={() => setIsEditorPlusOpen(true)}
         onTechnicalDocGeneratorClick={() => setIsTechnicalDocGeneratorOpen(true)}
         onGuideClick={() => setIsGuideOpen(true)}
+        onHistoryClick={() => setIsHistoryOpen(true)}
       />
       <main className="container mx-auto p-4 md:p-6">
         <div className="bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 max-w-5xl mx-auto">
@@ -230,6 +234,12 @@ export default function App(): React.ReactElement {
       {isGuideOpen && (
         <InteractiveGuideModal
           onClose={() => setIsGuideOpen(false)}
+        />
+      )}
+
+      {isHistoryOpen && (
+        <GlobalHistoryModal
+          onClose={() => setIsHistoryOpen(false)}
         />
       )}
     </div>

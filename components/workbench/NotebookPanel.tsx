@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { NotebookIcon } from '../icons/NotebookIcon';
 import { ClipboardIcon } from '../icons/ClipboardIcon';
@@ -8,9 +9,10 @@ import { WorkbenchService } from '../../services/workbenchService';
 interface NotebookPanelProps {
     content: string;
     setContent: (content: string) => void;
+    onExport?: (content: string, format: 'txt' | 'md' | 'docx' | 'pdf') => void;
 }
 
-export const NotebookPanel: React.FC<NotebookPanelProps> = ({ content, setContent }) => {
+export const NotebookPanel: React.FC<NotebookPanelProps> = ({ content, setContent, onExport }) => {
     const [isCopied, setIsCopied] = useState(false);
     const [exportFormat, setExportFormat] = useState<'txt' | 'md' | 'docx' | 'pdf'>('md');
 
@@ -24,7 +26,12 @@ export const NotebookPanel: React.FC<NotebookPanelProps> = ({ content, setConten
 
     const handleExport = () => {
         if (!content) return;
-        WorkbenchService.exportNotebook(content, exportFormat);
+        if (onExport) {
+            onExport(content, exportFormat);
+        } else {
+            // Fallback to direct service call if no prop provided (backward compatibility)
+            WorkbenchService.exportNotebook(content, exportFormat);
+        }
     };
     
     return (

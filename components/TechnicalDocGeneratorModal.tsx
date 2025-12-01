@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { XIcon } from './icons/XIcon';
 import { GearIcon } from './icons/GearIcon';
@@ -14,6 +15,7 @@ import {
   generateAuditChecklist,
   generateAnalyticalIndex,
 } from '../services/geminiService';
+import { historyService } from '../services/historyService';
 import { ThesisIcon } from './icons/ThesisIcon';
 import { CodeCommitIcon } from './icons/CodeCommitIcon';
 import { BugIcon } from './icons/BugIcon';
@@ -91,6 +93,7 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
     const sectionsToGenerate = SECTIONS.filter(s => selectedSections[s.id]);
     const totalSections = sectionsToGenerate.length;
     let content = `# Documento Técnico para ${repoUrl}\n\n`;
+    const repoName = repoUrl.split('/').pop() || 'repo';
     
     try {
       for (let i = 0; i < totalSections; i++) {
@@ -104,6 +107,15 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
         
         setGeneratedContent(content); // Update preview as sections complete
       }
+
+      // Save complete doc to history
+      historyService.addItem(
+          'Generador_Tecnico',
+          'Documentacion',
+          `doc_tecnico_${repoName}`,
+          content
+      );
+
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido.";
@@ -137,6 +149,10 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
         const newTotalContent = `${generatedContent}\n\n---\n\n### ${selectedDidactic.label}\n\n${newSectionContent}`;
         setGeneratedContent(newTotalContent);
 
+        // Update history
+        const repoName = repoUrl.split('/').pop() || 'repo';
+        historyService.addItem('Generador_Tecnico', 'Documentacion_Actualizada', `doc_tecnico_${repoName}_v2`, newTotalContent);
+
         if (translatedContent) {
             const targetLangLabel = ARGOS_LANGUAGES.find(l => l.value === targetLanguage)?.label || targetLanguage;
             setUpdateMessage(`Retraduciendo documento actualizado a ${targetLangLabel}...`);
@@ -161,13 +177,17 @@ const TechnicalDocGeneratorModal: React.FC<{ onClose: () => void }> = ({ onClose
     try {
         const result = await translateFullDocument(generatedContent, targetLanguage);
         setTranslatedContent(result);
+
+        const repoName = repoUrl.split('/').pop() || 'repo';
+        historyService.addItem('Generador_Tecnico', 'Traduccion', `doc_tecnico_${repoName}_${targetLanguage}`, result);
+
     } catch (error) {
         console.error("Translation failed", error);
         alert("La traducción ha fallado. Por favor, inténtelo de nuevo.");
     } finally {
         setIsTranslating(false);
     }
-  }, [generatedContent, targetLanguage]);
+  }, [generatedContent, targetLanguage, repoUrl]);
 
   const contentToDisplay = useMemo(() => translatedContent ?? generatedContent, [translatedContent, generatedContent]);
 

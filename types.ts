@@ -1,4 +1,5 @@
 
+
 export type ActiveTab = 'all' | 'documents' | 'videos' | 'news' | 'forums' | 'events' | 'magazines';
 
 export interface SearchResultItemBase {
@@ -120,4 +121,17 @@ export interface FormatSettings {
     lineHeight: string;
     margins: string;
     citationStyle: string;
+}
+
+// History Service Types
+export type PlatformTool = 'Editor_Plus' | 'Mesa_de_Trabajo' | 'Generador_Tecnico';
+
+export interface HistoryItem {
+    id: string;
+    tool: PlatformTool;
+    subCategory: string; // e.g., 'Auditoría', 'Resumen', 'Cuaderno', 'Documento'
+    filename: string;
+    content: string;
+    timestamp: number; // Date.now()
+    tags?: string[];
 }

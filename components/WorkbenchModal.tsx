@@ -11,6 +11,7 @@ import { ResultsPanel } from './workbench/ResultsPanel';
 import { ViewerPanel } from './workbench/ViewerPanel';
 import { NotebookPanel } from './workbench/NotebookPanel';
 import { WorkbenchService } from '../services/workbenchService';
+import { historyService } from '../services/historyService';
 import { Column } from './workbench/Column';
 import AddToNotebookModal from './workbench/AddToNotebookModal';
 
@@ -106,6 +107,15 @@ export default function WorkbenchModal({ onClose }: Props) {
     setCardForNotebook(null); // Close the modal
   }, []);
 
+  // Hook into notebook changes or specific "Save" actions if needed, 
+  // but for now, we save to history when exporting (handled inside NotebookPanel indirectly via WorkbenchService or we can add a save button)
+  // Let's modify exportNotebook in WorkbenchService to also return content so we can save it here, or just intercept.
+  
+  // NOTE: NotebookPanel handles export via WorkbenchService.exportNotebook. 
+  // We should update WorkbenchService to use historyService, or pass a handler. 
+  // For simplicity, we'll assume NotebookPanel calls a function that we pass down.
+  // ... Wait, NotebookPanel calls WorkbenchService.exportNotebook directly.
+  // I will update NotebookPanel props to accept onExport.
 
   const renderContent = () => {
     switch (stage) {
@@ -133,7 +143,15 @@ export default function WorkbenchModal({ onClose }: Props) {
                     <ViewerPanel document={selectedDoc} searchQuery={searchQuery} highlightedParagraphId={highlightedParagraphId} />
                 </Column>
                 <Column width="25%">
-                    <NotebookPanel content={notebookContent} setContent={setNotebookContent} />
+                    <NotebookPanel 
+                        content={notebookContent} 
+                        setContent={setNotebookContent}
+                        onExport={(content, format) => {
+                            WorkbenchService.exportNotebook(content, format);
+                            // Save to History
+                            historyService.addItem('Mesa_de_Trabajo', 'Cuaderno', 'notas_investigacion', content);
+                        }}
+                    />
                 </Column>
             </div>
         );
